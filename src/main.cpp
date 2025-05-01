@@ -56,7 +56,7 @@ void setup() {
 
 void loop() {
     // Run safety checks
-    runSafetyChecks();
+    //runSafetyChecks();
     
     // Handle door control functionality
     runDoorControl();
@@ -123,15 +123,16 @@ void runSafetyChecks() {
 void runDoorControl() {
     // Process door button input
     handleDoorButton(podOpenFlag, childLockOn);
-    
+    manageMotors(podOpenFlag);
+
     // Check if it's safe to operate the pod
-    if (isSafeToOperate()) {
-        // Manage motors based on current pod state
-        manageMotors(podOpenFlag);
-    } else {
-        // Safety check failed, ensure motors are stopped
-        stopAllMotors();
-    }
+    // if (isSafeToOperate()) {
+    //     // Manage motors based on current pod state
+    //     manageMotors(podOpenFlag);
+    // } else {
+    //     // Safety check failed, ensure motors are stopped
+    //     stopAllMotors();
+    // }
 }
 
 // Handle LED related functionality
@@ -145,7 +146,7 @@ void printDebugInfo() {
     static unsigned long lastDebugTime = 0;
     
     // Only update debug info every 500ms to avoid flooding serial
-    if (millis() - lastDebugTime > 500) {
+    if (millis() - lastDebugTime > 1000) {
         uint8_t currentState = readState();
         float voltage = readAverageVoltage();
         uint8_t safetyStatus = getSafetyStatus();
