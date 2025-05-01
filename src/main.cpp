@@ -7,7 +7,7 @@ Hardware compatibility:
 
 Description:
 This firmware controls the Sole Pod system, managing door motors,
-tray motors, LED lighting, and safety sensors.
+tray motors, LED lighting, safety sensors, and BLE connectivity.
 */
 
 #include <Arduino.h>
@@ -16,23 +16,23 @@ tray motors, LED lighting, and safety sensors.
 #include "Sensors.h"
 #include "LEDControl.h"
 #include "VoltageReader.h"
-#include "SafetyController.h"
+#include "BLEControl.h" // Add BLEControl header
 
 // Configuration settings
 #define DEBUG_MODE true       // Enable/disable debug messages
 #define LOOP_DELAY_MS 10      // Main loop delay in milliseconds
-#define SAFETY_CHECK_INTERVAL 50 // Check safety every 50ms
 
 // System state flags
 bool childLockOn = false;     // Child lock status (true = locked)
 bool podOpenFlag = false;     // Pod position flag (true = open, false = closed)
-unsigned long lastSafetyCheckTime = 0; // For periodic safety checks
+
+// Create BLE Control instance
+BLEControl bleControl(&podOpenFlag); // Pass a reference to podOpenFlag
 
 // Function prototypes
 void setupSystem();
 void runDoorControl();
 void runLEDControl();
-void runSafetyChecks();
 void printDebugInfo();
 
 void setup() {
@@ -87,52 +87,50 @@ void setupSystem() {
     // Initialize LED control
     initLEDs();
     
-    // Initialize safety controller
-    initSafetyController();
-}
-
-// Perform regular safety checks
-void runSafetyChecks() {
-    unsigned long currentTime = millis();
-    
-    // Run safety checks at regular intervals
-    if (currentTime - lastSafetyCheckTime >= SAFETY_CHECK_INTERVAL) {
-        // Check if it's safe to operate
-        bool safeToOperate = isSafeToOperate();
-        
-        // If not safe, stop all motors and notify
-        if (!safeToOperate) {
-            // Just to be extra sure, stop all motors again
-            stopAllMotors();
-            
-            // Disable the door and LED control buttons when locked
-            // This ensures the user can't try to operate the unit
-            childLockOn = true;
-            
-            if (DEBUG_MODE) {
-                Serial.println("SAFETY CHECK FAILED: Motors stopped and controls disabled");
-                Serial.println("Power cycle required to reset system");
-            }
-        }
-        
-        lastSafetyCheckTime = currentTime;
-    }
+    // Initialize BLE control
+    bleControl.begin();
 }
 
 // Handle door related functionality
 void runDoorControl() {
+    static uint8_t prevState = POD_STATE_UNDEFINED;
+    static bool prevOpenFlag = false;
+    
     // Process door button input
     handleDoorButton(podOpenFlag, childLockOn);
     manageMotors(podOpenFlag);
-
-    // Check if it's safe to operate the pod
-    // if (isSafeToOperate()) {
-    //     // Manage motors based on current pod state
-    //     manageMotors(podOpenFlag);
-    // } else {
-    //     // Safety check failed, ensure motors are stopped
-    //     stopAllMotors();
-    // }
+    
+    // Read current door state
+    uint8_t currentState = readState();
+    
+    // Update BLE door status if:
+    // 1. The physical door state has changed OR
+    // 2. The target state (podOpenFlag) has changed
+    if (prevState != currentState || prevOpenFlag != podOpenFlag) {
+        // Determine if door is considered "open" for BLE status
+        // Door is "open" when:
+        // - It's physically open (POD_STATE_DOOR_OPEN or further)
+        // - OR it's in transition and the target is "open" (podOpenFlag = true)
+        bool doorIsOpenForBLE = false;
+        
+        if (currentState == POD_STATE_DOOR_OPEN || 
+            currentState == POD_STATE_TRAY_MIDWAY || 
+            currentState == POD_STATE_OPEN) {
+            // Door is physically open or further in open state
+            doorIsOpenForBLE = true;
+        } 
+        else if (currentState == POD_STATE_DOOR_MIDWAY) {
+            // Door is in transition - use the target state
+            doorIsOpenForBLE = podOpenFlag;
+        }
+        
+        // Update BLE status
+        bleControl.updateDoorStatus(doorIsOpenForBLE);
+        
+        // Update previous values for next iteration
+        prevState = currentState;
+        prevOpenFlag = podOpenFlag;
+    }
 }
 
 // Handle LED related functionality
@@ -149,15 +147,8 @@ void printDebugInfo() {
     if (millis() - lastDebugTime > 1000) {
         uint8_t currentState = readState();
         float voltage = readAverageVoltage();
-        uint8_t safetyStatus = getSafetyStatus();
         
         Serial.println("--- System Status ---");
-        
-        // If system is locked, display a prominent warning
-        if (systemLocked) {
-            Serial.println("!!! SYSTEM LOCKED - POWER CYCLE REQUIRED !!!");
-            Serial.println("!!! MOTOR STALL DETECTED - CHECK HARDWARE !!!");
-        }
         
         Serial.print("Pod State: ");
         Serial.print(getStateDescription(currentState));
@@ -177,24 +168,6 @@ void printDebugInfo() {
         Serial.print("V (Stall Threshold: ");
         Serial.print(STALL_VOLTAGE_THRESHOLD);
         Serial.println("V)");
-        Serial.print("Safety Status: ");
-        
-        // Show detailed safety status
-        switch (safetyStatus) {
-            case SAFETY_STATUS_OK:
-                Serial.println("OK");
-                break;
-            case SAFETY_STATUS_MOTOR_STALL:
-                Serial.println("CRITICAL FAULT: MOTOR STALL");
-                break;
-            case SAFETY_STATUS_OBSTACLE_DETECTED:
-                Serial.println("FAULT: OBSTACLE DETECTED");
-                break;
-            default:
-                Serial.print("FAULT CODE: ");
-                Serial.println(safetyStatus);
-                break;
-        }
         
         // Print individual sensor states
         Serial.println("Sensors:");
