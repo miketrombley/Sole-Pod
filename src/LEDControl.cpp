@@ -8,6 +8,7 @@ bool previousLedBtnState = HIGH;
 
 // Light Status
 uint8_t lightState = LED_STATE_OFF; // 0 = Light Off, 1 = Light On
+uint8_t ledBrightness = MAX_BRIGHTNESS; // Default to full brightness (100%)
 
 void initLEDs() {
     // Initialize FastLED with the LED strip configuration
@@ -48,7 +49,11 @@ void setLEDState(uint8_t state) {
     
     if (lightState == LED_STATE_ON) {
         // Turn on the LED (white color)
-        leds[0] = CRGB::White;
+        leds[0] = CRGB::Blue;
+        
+        // Scale brightness from 0-100 to 0-255 for FastLED
+        uint8_t scaledBrightness = map(ledBrightness, 0, 100, 0, 255);
+        FastLED.setBrightness(scaledBrightness);
         Serial.println("LED turned ON");
     } else {
         // Turn off the LED
@@ -62,4 +67,30 @@ void setLEDState(uint8_t state) {
 
 uint8_t getLEDState() {
     return lightState;
+}
+
+void setLEDBrightness(uint8_t brightness) {
+    // Ensure brightness is in valid range (0-100)
+    if (brightness > MAX_BRIGHTNESS) {
+        brightness = MAX_BRIGHTNESS;
+    }
+    
+    // Update the brightness
+    ledBrightness = brightness;
+    
+    // Update the physical LED if it's on
+    if (lightState == LED_STATE_ON) {
+        // Scale brightness from 0-100 to 0-255 for FastLED
+        uint8_t scaledBrightness = map(ledBrightness, 0, 100, 0, 255);
+        FastLED.setBrightness(scaledBrightness);
+        FastLED.show();
+    }
+    
+    Serial.print("LED brightness set to: ");
+    Serial.print(ledBrightness);
+    Serial.println("%");
+}
+
+uint8_t getLEDBrightness() {
+    return ledBrightness;
 }

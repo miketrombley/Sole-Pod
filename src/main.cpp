@@ -133,15 +133,16 @@ void runDoorControl() {
     }
 }
 
-// Handle LED related functionality including BLE updates
 void runLEDControl() {
     static uint8_t prevLEDState = 255; // Initialize with an invalid state to force first update
+    static uint8_t prevLEDBrightness = 101; // Track previous brightness
     
     // Process LED button input
     handleLEDButton(childLockOn);
     
-    // Read current LED state
+    // Read current LED state and brightness
     uint8_t currentLEDState = getLEDState();
+    uint8_t currentLEDBrightness = getLEDBrightness();
     
     // Update BLE LED status if the LED state has changed
     if (prevLEDState != currentLEDState) {
@@ -150,6 +151,15 @@ void runLEDControl() {
         
         // Update previous state for next iteration
         prevLEDState = currentLEDState;
+    }
+    
+    // Update BLE LED brightness if the brightness has changed
+    if (prevLEDBrightness != currentLEDBrightness) {
+        // Brightness is already in 0-100 range, no scaling needed
+        bleControl.updateLEDBrightness(currentLEDBrightness);
+        
+        // Update previous brightness for next iteration
+        prevLEDBrightness = currentLEDBrightness;
     }
 }
 
@@ -168,6 +178,10 @@ void printDebugInfo() {
         Serial.print(getStateDescription(currentState));
         Serial.print(" (");
         Serial.print(currentState);
+        Serial.print("LED State: ");
+        Serial.print(getLEDState() == LED_STATE_ON ? "ON" : "OFF");
+        Serial.print("LED Brightness: ");
+        Serial.println(getLEDBrightness());
         Serial.println(")");
         Serial.print("Target: ");
         Serial.println(podOpenFlag ? "OPENING/OPEN" : "CLOSING/CLOSED");
@@ -177,11 +191,8 @@ void printDebugInfo() {
         Serial.println(getDoorPosition());
         Serial.print("LED State: ");
         Serial.println(getLEDState() == LED_STATE_ON ? "ON" : "OFF");
-        Serial.print("Voltage: ");
-        Serial.print(voltage);
-        Serial.print("V (Stall Threshold: ");
-        Serial.print(STALL_VOLTAGE_THRESHOLD);
-        Serial.println("V)");
+        Serial.print("LED Brightness: ");
+        Serial.println(getLEDBrightness());
         
         // Print individual sensor states
         Serial.println("Sensors:");

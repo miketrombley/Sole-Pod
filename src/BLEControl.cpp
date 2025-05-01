@@ -1,43 +1,46 @@
 #include "BLEControl.h"
 #include "MotorControl.h"
-#include "LEDControl.h"  // Include LED Control to access functions
+#include "LEDControl.h"
 #include <Arduino.h>
 
-// Implement callback functions from DoorStatusCallbacks class
-void DoorStatusCallbacks::onWrite(BLECharacteristic* characteristic) {
-    if (bleControl) {
+// Implement generic callback functions
+void BLECharacteristicCallback::onWrite(BLECharacteristic* characteristic) {
+    if (!bleControl) return;
+    
+    std::string uuid = characteristic->getUUID().toString();
+    
+    if (uuid == UUID_DOOR_STATUS) {
         bleControl->handleDoorStatusWrite(characteristic);
+    }
+    else if (uuid == UUID_LIGHTS) {
+        bleControl->handleLEDStatusWrite(characteristic);
+    }
+    else if (uuid == UUID_LIGHTS_BRIGHTNESS) {
+        bleControl->handleLEDBrightnessWrite(characteristic);
     }
 }
 
-void DoorStatusCallbacks::onRead(BLECharacteristic* characteristic) {
-    // Log when a client reads the door status characteristic
-    if (characteristic->getUUID().toString() == UUID_DOOR_STATUS) {
-        std::string value = characteristic->getValue();
+void BLECharacteristicCallback::onRead(BLECharacteristic* characteristic) {
+    std::string uuid = characteristic->getUUID().toString();
+    std::string value = characteristic->getValue();
+    
+    if (uuid == UUID_DOOR_STATUS) {
         Serial.print("BLE Client read door status: ");
         Serial.println(value.c_str());
     }
-}
-
-// Implement callback functions from LEDStatusCallbacks class
-void LEDStatusCallbacks::onWrite(BLECharacteristic* characteristic) {
-    if (bleControl) {
-        bleControl->handleLEDStatusWrite(characteristic);
-    }
-}
-
-void LEDStatusCallbacks::onRead(BLECharacteristic* characteristic) {
-    // Log when a client reads the LED status characteristic
-    if (characteristic->getUUID().toString() == UUID_LIGHTS) {
-        std::string value = characteristic->getValue();
+    else if (uuid == UUID_LIGHTS) {
         Serial.print("BLE Client read LED status: ");
+        Serial.println(value.c_str());
+    }
+    else if (uuid == UUID_LIGHTS_BRIGHTNESS) {
+        Serial.print("BLE Client read LED brightness: ");
         Serial.println(value.c_str());
     }
 }
 
 // BLEControl constructor that takes a reference to the podOpenFlag
 BLEControl::BLEControl(bool* podOpenFlag) 
-    : pServer(nullptr), pDoorStatus(nullptr), pLEDStatus(nullptr), podOpenFlagRef(podOpenFlag) {
+    : pServer(nullptr), pDoorStatus(nullptr), pLEDStatus(nullptr), pLEDBrightness(nullptr), podOpenFlagRef(podOpenFlag) {
 }
 
 void BLEControl::begin() {
@@ -53,18 +56,29 @@ void BLEControl::begin() {
         UUID_DOOR_STATUS, 
         BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_READ
     );
-    pDoorStatus->setCallbacks(new DoorStatusCallbacks(this));
+    pDoorStatus->setCallbacks(new BLECharacteristicCallback(this, UUID_DOOR_STATUS));
     
     // Create LED Status Characteristic
     pLEDStatus = pService->createCharacteristic(
         UUID_LIGHTS,
         BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_READ
     );
-    pLEDStatus->setCallbacks(new LEDStatusCallbacks(this));
+    pLEDStatus->setCallbacks(new BLECharacteristicCallback(this, UUID_LIGHTS));
+    
+    // Create LED Brightness Characteristic
+    pLEDBrightness = pService->createCharacteristic(
+        UUID_LIGHTS_BRIGHTNESS,
+        BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_READ
+    );
+    pLEDBrightness->setCallbacks(new BLECharacteristicCallback(this, UUID_LIGHTS_BRIGHTNESS));
     
     // Set initial values based on current states
     updateDoorStatus(*podOpenFlagRef);
-    updateLEDStatus(getLEDState());  // Get the current LED state from LEDControl
+    updateLEDStatus(getLEDState());
+    
+    // Convert internal brightness (0-255) to BLE brightness (0-100)
+    uint8_t scaledBrightness = map(getLEDBrightness(), 0, 255, 0, 100);
+    updateLEDBrightness(scaledBrightness);
 
     // Start the service
     pService->start();
@@ -84,6 +98,7 @@ void BLEControl::handleDoorStatusWrite(BLECharacteristic* characteristic) {
         // Convert received value to string for easier processing
         String doorStatus = String(value.c_str());
         
+        // Only accept valid values (0 or 1)
         if (doorStatus == "1") {
             // Open the pod
             Serial.println("BLE Command: Open Pod");
@@ -95,7 +110,7 @@ void BLEControl::handleDoorStatusWrite(BLECharacteristic* characteristic) {
             *podOpenFlagRef = false;
         }
         else {
-            Serial.println("Invalid Door Status value received!");
+            Serial.println("Invalid Door Status value received! Only 0 or 1 allowed.");
         }
     }
 }
@@ -107,6 +122,7 @@ void BLEControl::handleLEDStatusWrite(BLECharacteristic* characteristic) {
         // Convert received value to string for easier processing
         String ledStatus = String(value.c_str());
         
+        // Only accept valid values (0 or 1)
         if (ledStatus == "1") {
             // Turn on the LED
             Serial.println("BLE Command: Turn LED ON");
@@ -118,10 +134,39 @@ void BLEControl::handleLEDStatusWrite(BLECharacteristic* characteristic) {
             setLEDState(LED_STATE_OFF);
         }
         else {
-            Serial.println("Invalid LED Status value received!");
+            Serial.println("Invalid LED Status value received! Only 0 or 1 allowed.");
         }
     }
 }
+
+void BLEControl::handleLEDBrightnessWrite(BLECharacteristic* characteristic) {
+    if (characteristic == pLEDBrightness) {
+        std::string value = characteristic->getValue();
+        
+        // Convert received value to integer
+        int brightness = 0;
+        try {
+            brightness = std::stoi(value);
+            
+            // Validate brightness range (0-100)
+            if (brightness >= 0 && brightness <= 100) {
+                Serial.print("BLE Command: Set LED Brightness to ");
+                Serial.print(brightness);
+                Serial.println("%");
+                
+                // Pass directly to LED control (already in 0-100 range)
+                setLEDBrightness(brightness);
+            } else {
+                Serial.print("Invalid brightness value received: ");
+                Serial.print(brightness);
+                Serial.println(". Value must be between 0-100!");
+            }
+        } catch (...) {
+            Serial.println("Invalid LED Brightness value received! Must be a number between 0-100.");
+        }
+    }
+}
+
 
 void BLEControl::updateDoorStatus(bool isOpen) {
     // Update the BLE characteristic with the current door state
@@ -140,5 +185,21 @@ void BLEControl::updateLEDStatus(uint8_t ledState) {
         pLEDStatus->setValue(status.c_str());
         Serial.print("BLE LED Status updated: ");
         Serial.println(status);
+    }
+}
+
+void BLEControl::updateLEDBrightness(uint8_t brightness) {
+    // Ensure value is within allowed range (0-100)
+    if (brightness > MAX_BRIGHTNESS) {
+        brightness = MAX_BRIGHTNESS;
+    }
+    
+    // Update the BLE characteristic with the current LED brightness
+    if (pLEDBrightness) {
+        String value = String(brightness);
+        pLEDBrightness->setValue(value.c_str());
+        Serial.print("BLE LED Brightness updated: ");
+        Serial.print(brightness);
+        Serial.println(" (0-100 scale)");
     }
 }

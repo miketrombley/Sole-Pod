@@ -12,10 +12,17 @@
 #define LED_STATE_OFF 0
 #define LED_STATE_ON 1
 
+// LED brightness constants
+#define MAX_BRIGHTNESS 100
+
 // Function prototypes
 void initLEDs();
 void handleLEDButton(bool childLockOn);
 void setLEDState(uint8_t state);
 uint8_t getLEDState();
+void setLEDBrightness(uint8_t brightness);
+uint8_t getLEDBrightness();
+
+extern uint8_t ledBrightness;
 
 #endif // LED_CONTROL_H
