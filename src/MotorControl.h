@@ -29,8 +29,10 @@ void setPodState(uint8_t transition);
 void podOpen();
 void podClose();
 uint8_t getDoorPosition();
+void setDoorPosition(uint8_t position);
 
 // Make externally available so other modules can check
 extern bool systemLocked;
+extern uint8_t doorPosition;
 
 #endif // MOTOR_CONTROL_H

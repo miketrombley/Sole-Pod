@@ -12,12 +12,16 @@ void BLECharacteristicCallback::onWrite(BLECharacteristic* characteristic) {
     if (uuid == UUID_DOOR_STATUS) {
         bleControl->handleDoorStatusWrite(characteristic);
     }
+    else if (uuid == UUID_DOOR_POSITION) {
+        bleControl->handleDoorPositionWrite(characteristic);
+    }
     else if (uuid == UUID_LIGHTS) {
         bleControl->handleLEDStatusWrite(characteristic);
     }
     else if (uuid == UUID_LIGHTS_BRIGHTNESS) {
         bleControl->handleLEDBrightnessWrite(characteristic);
     }
+
 }
 
 void BLECharacteristicCallback::onRead(BLECharacteristic* characteristic) {
@@ -26,6 +30,10 @@ void BLECharacteristicCallback::onRead(BLECharacteristic* characteristic) {
     
     if (uuid == UUID_DOOR_STATUS) {
         Serial.print("BLE Client read door status: ");
+        Serial.println(value.c_str());
+    }
+    else if (uuid == UUID_DOOR_POSITION) {
+        Serial.print("BLE Client read door position: ");
         Serial.println(value.c_str());
     }
     else if (uuid == UUID_LIGHTS) {
@@ -40,7 +48,7 @@ void BLECharacteristicCallback::onRead(BLECharacteristic* characteristic) {
 
 // BLEControl constructor that takes a reference to the podOpenFlag
 BLEControl::BLEControl(bool* podOpenFlag) 
-    : pServer(nullptr), pDoorStatus(nullptr), pLEDStatus(nullptr), pLEDBrightness(nullptr), podOpenFlagRef(podOpenFlag) {
+    : pServer(nullptr), pDoorStatus(nullptr), pDoorPosition(nullptr), pLEDStatus(nullptr), pLEDBrightness(nullptr), podOpenFlagRef(podOpenFlag) {
 }
 
 void BLEControl::begin() {
@@ -57,6 +65,13 @@ void BLEControl::begin() {
         BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_READ
     );
     pDoorStatus->setCallbacks(new BLECharacteristicCallback(this, UUID_DOOR_STATUS));
+
+    // Create Door Position Characteristic
+    pDoorPosition = pService->createCharacteristic(
+        UUID_DOOR_POSITION, 
+        BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_READ
+    );
+    pDoorPosition->setCallbacks(new BLECharacteristicCallback(this, UUID_DOOR_POSITION));
     
     // Create LED Status Characteristic
     pLEDStatus = pService->createCharacteristic(
@@ -74,6 +89,7 @@ void BLEControl::begin() {
     
     // Set initial values based on current states
     updateDoorStatus(*podOpenFlagRef);
+    updateDoorPosition(getDoorPosition());
     updateLEDStatus(getLEDState());
     
     // Convert internal brightness (0-255) to BLE brightness (0-100)
@@ -167,7 +183,6 @@ void BLEControl::handleLEDBrightnessWrite(BLECharacteristic* characteristic) {
     }
 }
 
-
 void BLEControl::updateDoorStatus(bool isOpen) {
     // Update the BLE characteristic with the current door state
     if (pDoorStatus) {
@@ -201,5 +216,51 @@ void BLEControl::updateLEDBrightness(uint8_t brightness) {
         Serial.print("BLE LED Brightness updated: ");
         Serial.print(brightness);
         Serial.println(" (0-100 scale)");
+    }
+}
+
+void BLEControl::handleDoorPositionWrite(BLECharacteristic* characteristic) {
+    if (characteristic == pDoorPosition) {
+        std::string value = characteristic->getValue();
+        
+        // Convert received value to integer
+        int position = 0;
+        try {
+            position = std::stoi(value);
+            
+            // Validate position (only 50 or 100 allowed)
+            if (position == 50 || position == 100) {
+                Serial.print("BLE Command: Set Door Position to ");
+                Serial.println(position);
+                
+                // Update the door position
+                setDoorPosition(position);
+                
+                // Update the BLE characteristic
+                updateDoorPosition(position);
+            } else {
+                Serial.print("Invalid door position value received: ");
+                Serial.print(position);
+                Serial.println(". Value must be either 50 or 100!");
+            }
+        } catch (...) {
+            Serial.println("Invalid Door Position value received! Must be either 50 or 100.");
+        }
+    }
+}
+
+// Add function to update the BLE characteristic:
+void BLEControl::updateDoorPosition(uint8_t position) {
+    // Ensure position is valid (50 or 100)
+    if (position != 50 && position != 100) {
+        position = 100; // Default to 100 if invalid
+    }
+    
+    // Update the BLE characteristic
+    if (pDoorPosition) {
+        String value = String(position);
+        pDoorPosition->setValue(value.c_str());
+        Serial.print("BLE Door Position updated: ");
+        Serial.println(position);
     }
 }

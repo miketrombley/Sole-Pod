@@ -88,10 +88,9 @@ void podClose() {
     
     // Door Open, Tray Open or Closing (State 4->3->2)
     if (currentState == POD_STATE_OPEN || currentState == POD_STATE_TRAY_MIDWAY) {
-        // Only close tray if door is fully open
-        if (doorPosition == 100) {
-            setPodState(TRAY_CLOSING);
-        }
+        // Remove the doorPosition check when closing
+        // Always close the tray when closing the pod
+        setPodState(TRAY_CLOSING);
     }
     // Door Open or Closing, Tray Closed (State 2->1->0)
     else if (currentState == POD_STATE_DOOR_OPEN || currentState == POD_STATE_DOOR_MIDWAY) {
@@ -149,4 +148,15 @@ void setPodState(uint8_t transition) {
 
 uint8_t getDoorPosition() {
     return doorPosition;
+}
+
+void setDoorPosition(uint8_t position) {
+    // Only allow values of 50 or 100
+    if (position == 50 || position == 100) {
+        doorPosition = position;
+        Serial.print("Door position set to: ");
+        Serial.println(doorPosition);
+    } else {
+        Serial.println("Invalid door position! Only 50 or 100 allowed.");
+    }
 }

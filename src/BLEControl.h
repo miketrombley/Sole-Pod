@@ -9,6 +9,7 @@
 
 // Define Service and Characteristic UUIDs
 #define UUID_SERVICE           "7d840001-11eb-4c13-89f2-246b6e0b0000"
+#define UUID_DOOR_POSITION    "7d840003-11eb-4c13-89f2-246b6e0b0002"
 #define UUID_DOOR_STATUS       "7d840002-11eb-4c13-89f2-246b6e0b0001"
 #define UUID_LIGHTS            "7d840004-11eb-4c13-89f2-246b6e0b0003"
 #define UUID_LIGHTS_BRIGHTNESS "7d840005-11eb-4c13-89f2-246b6e0b0004"
@@ -38,6 +39,7 @@ class BLEControl {
 private:
     BLEServer* pServer;
     BLECharacteristic* pDoorStatus;
+    BLECharacteristic* pDoorPosition;
     BLECharacteristic* pLEDStatus;
     BLECharacteristic* pLEDBrightness;
     
@@ -50,6 +52,9 @@ public:
     
     // Handler for door status characteristic changes
     void handleDoorStatusWrite(BLECharacteristic* characteristic);
+
+    // Handler for door position characteristic changes
+    void handleDoorPositionWrite(BLECharacteristic* characteristic);
     
     // Handler for LED status characteristic changes
     void handleLEDStatusWrite(BLECharacteristic* characteristic);
@@ -59,6 +64,9 @@ public:
     
     // Updates the BLE characteristic based on the current door state
     void updateDoorStatus(bool isOpen);
+
+    // Updates the BLE characteristic based on the current door position
+    void updateDoorPosition(uint8_t position);
     
     // Updates the BLE characteristic based on the current LED state
     void updateLEDStatus(uint8_t ledState);

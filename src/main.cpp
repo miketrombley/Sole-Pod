@@ -95,6 +95,7 @@ void setupSystem() {
 void runDoorControl() {
     static uint8_t prevState = POD_STATE_UNDEFINED;
     static bool prevOpenFlag = false;
+    static uint8_t prevDoorPosition = 0; // Add this line
     
     // Process door button input
     handleDoorButton(podOpenFlag, childLockOn);
@@ -102,6 +103,7 @@ void runDoorControl() {
     
     // Read current door state
     uint8_t currentState = readState();
+    uint8_t currentDoorPosition = getDoorPosition(); // Add this line
     
     // Update BLE door status if:
     // 1. The physical door state has changed OR
@@ -130,6 +132,12 @@ void runDoorControl() {
         // Update previous values for next iteration
         prevState = currentState;
         prevOpenFlag = podOpenFlag;
+    }
+
+    // Update BLE door position if it has changed
+    if (prevDoorPosition != currentDoorPosition) {
+        bleControl.updateDoorPosition(currentDoorPosition);
+        prevDoorPosition = currentDoorPosition;
     }
 }
 
