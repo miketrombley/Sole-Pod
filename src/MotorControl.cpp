@@ -114,7 +114,8 @@ void setPodState(uint8_t transition) {
         // Door opening
         case DOOR_OPENING:
             digitalWrite(DOOR_MOTOR, HIGH);
-            digitalWrite(DOOR_DIRECTION, LOW);  // Direction for opening
+            //digitalWrite(DOOR_DIRECTION, LOW);  // Direction for opening (old)
+            digitalWrite(DOOR_DIRECTION, HIGH);  // Direction for opening
             digitalWrite(TRAY_MOTOR, LOW);
             break;
             
@@ -135,7 +136,8 @@ void setPodState(uint8_t transition) {
         // Door closing
         case DOOR_CLOSING:
             digitalWrite(DOOR_MOTOR, HIGH);
-            digitalWrite(DOOR_DIRECTION, HIGH); // Direction for closing
+            //digitalWrite(DOOR_DIRECTION, HIGH); // Direction for closing (old)
+            digitalWrite(DOOR_DIRECTION, LOW);  // Direction for opening
             digitalWrite(TRAY_MOTOR, LOW);
             break;
             
