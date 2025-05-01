@@ -9,6 +9,7 @@ bool previousLedBtnState = HIGH;
 // Light Status
 uint8_t lightState = LED_STATE_OFF; // 0 = Light Off, 1 = Light On
 uint8_t ledBrightness = MAX_BRIGHTNESS; // Default to full brightness (100%)
+String ledColorHex = "0000FF"; // Default to blue color
 
 void initLEDs() {
     // Initialize FastLED with the LED strip configuration
@@ -44,12 +45,16 @@ void handleLEDButton(bool childLockOn) {
     previousLedBtnState = ledBtnState;
 }
 
+// Modify the existing setLEDState function to use the current color
 void setLEDState(uint8_t state) {
     lightState = state;
     
     if (lightState == LED_STATE_ON) {
-        // Turn on the LED (white color)
-        leds[0] = CRGB::Blue;
+        // Use the current color instead of hardcoded blue
+        uint8_t r = strtol(ledColorHex.substring(0, 2).c_str(), nullptr, 16);
+        uint8_t g = strtol(ledColorHex.substring(2, 4).c_str(), nullptr, 16);
+        uint8_t b = strtol(ledColorHex.substring(4, 6).c_str(), nullptr, 16);
+        leds[0] = CRGB(r, g, b);
         
         // Scale brightness from 0-100 to 0-255 for FastLED
         uint8_t scaledBrightness = map(ledBrightness, 0, 100, 0, 255);
@@ -93,4 +98,54 @@ void setLEDBrightness(uint8_t brightness) {
 
 uint8_t getLEDBrightness() {
     return ledBrightness;
+}
+
+void setLEDColor(String colorHex) {
+    // Process the incoming color
+    if (colorHex.length() == 8) {  // Expecting HEX value with alpha channel (e.g., "FF0019FF")
+        // Truncate the first two characters (alpha channel) to keep RGB FF = 100% opacity
+        // This is a 6-digit hex color code 
+        String rgbColor = colorHex.substring(2);  // Get substring from the 3rd character onward
+        ledColorHex = rgbColor; // Save the RGB part for tracking
+        
+        // Debug output
+        Serial.printf("6-Bit HEX Color: %s\n", rgbColor.c_str());
+        
+        // Convert the RGB hex string to individual R, G, B values
+        uint8_t r = strtol(rgbColor.substring(0, 2).c_str(), nullptr, 16);
+        uint8_t g = strtol(rgbColor.substring(2, 4).c_str(), nullptr, 16);
+        uint8_t b = strtol(rgbColor.substring(4, 6).c_str(), nullptr, 16);
+        
+        // Set the LED color if it's on
+        if (lightState == LED_STATE_ON) {
+            leds[0] = CRGB(r, g, b);
+            FastLED.show();
+        }
+        
+        Serial.printf("LED color set to R:%d G:%d B:%d\n", r, g, b);
+    } 
+    else if (colorHex.length() == 6) {  // Already a 6-digit hex
+        ledColorHex = colorHex; // Save for tracking
+        
+        // Convert the RGB hex string to individual R, G, B values
+        uint8_t r = strtol(colorHex.substring(0, 2).c_str(), nullptr, 16);
+        uint8_t g = strtol(colorHex.substring(2, 4).c_str(), nullptr, 16);
+        uint8_t b = strtol(colorHex.substring(4, 6).c_str(), nullptr, 16);
+        
+        // Set the LED color if it's on
+        if (lightState == LED_STATE_ON) {
+            leds[0] = CRGB(r, g, b);
+            FastLED.show();
+        }
+        
+        Serial.printf("LED color set to R:%d G:%d B:%d\n", r, g, b);
+    }
+    else {
+        Serial.println("Invalid color format! Expected 6 or 8 character hex string.");
+    }
+}
+
+// Add this new function to get LED color
+String getLEDColor() {
+    return ledColorHex;
 }

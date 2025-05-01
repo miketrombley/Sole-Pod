@@ -1,7 +1,6 @@
 #include "BLEControl.h"
 #include "MotorControl.h"
 #include "LEDControl.h"
-#include <Arduino.h>
 
 // Implement generic callback functions
 void BLECharacteristicCallback::onWrite(BLECharacteristic* characteristic) {
@@ -21,7 +20,9 @@ void BLECharacteristicCallback::onWrite(BLECharacteristic* characteristic) {
     else if (uuid == UUID_LIGHTS_BRIGHTNESS) {
         bleControl->handleLEDBrightnessWrite(characteristic);
     }
-
+    else if (uuid == UUID_LIGHTS_COLOR) {
+        bleControl->handleLEDColorWrite(characteristic);
+    }
 }
 
 void BLECharacteristicCallback::onRead(BLECharacteristic* characteristic) {
@@ -44,11 +45,17 @@ void BLECharacteristicCallback::onRead(BLECharacteristic* characteristic) {
         Serial.print("BLE Client read LED brightness: ");
         Serial.println(value.c_str());
     }
+    else if (uuid == UUID_LIGHTS_COLOR) {
+        Serial.print("BLE Client read LED color: ");
+        Serial.println(value.c_str());
+    }
 }
 
 // BLEControl constructor that takes a reference to the podOpenFlag
 BLEControl::BLEControl(bool* podOpenFlag) 
-    : pServer(nullptr), pDoorStatus(nullptr), pDoorPosition(nullptr), pLEDStatus(nullptr), pLEDBrightness(nullptr), podOpenFlagRef(podOpenFlag) {
+    : pServer(nullptr), pDoorStatus(nullptr), pDoorPosition(nullptr), 
+      pLEDStatus(nullptr), pLEDBrightness(nullptr), pLEDColor(nullptr), 
+      podOpenFlagRef(podOpenFlag) {
 }
 
 void BLEControl::begin() {
@@ -87,6 +94,13 @@ void BLEControl::begin() {
     );
     pLEDBrightness->setCallbacks(new BLECharacteristicCallback(this, UUID_LIGHTS_BRIGHTNESS));
     
+    // Create LED Color Characteristic
+    pLEDColor = pService->createCharacteristic(
+        UUID_LIGHTS_COLOR,
+        BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_READ
+    );
+    pLEDColor->setCallbacks(new BLECharacteristicCallback(this, UUID_LIGHTS_COLOR));
+    
     // Set initial values based on current states
     updateDoorStatus(*podOpenFlagRef);
     updateDoorPosition(getDoorPosition());
@@ -95,6 +109,9 @@ void BLEControl::begin() {
     // Convert internal brightness (0-255) to BLE brightness (0-100)
     uint8_t scaledBrightness = map(getLEDBrightness(), 0, 255, 0, 100);
     updateLEDBrightness(scaledBrightness);
+    
+    // Set initial color
+    updateLEDColor(getLEDColor());
 
     // Start the service
     pService->start();
@@ -262,5 +279,29 @@ void BLEControl::updateDoorPosition(uint8_t position) {
         pDoorPosition->setValue(value.c_str());
         Serial.print("BLE Door Position updated: ");
         Serial.println(position);
+    }
+}
+
+void BLEControl::handleLEDColorWrite(BLECharacteristic* characteristic) {
+    if (characteristic == pLEDColor) {
+        std::string value = characteristic->getValue();
+        
+        // Convert received value to string for easier processing
+        String ledColor = String(value.c_str());
+        
+        Serial.print("BLE Command: Set LED Color to ");
+        Serial.println(ledColor);
+        
+        // Set the LED color using the provided value
+        setLEDColor(ledColor);
+    }
+}
+
+void BLEControl::updateLEDColor(String color) {
+    // Update the BLE characteristic with the current LED color
+    if (pLEDColor) {
+        pLEDColor->setValue(color.c_str());
+        Serial.print("BLE LED Color updated: ");
+        Serial.println(color);
     }
 }

@@ -144,13 +144,15 @@ void runDoorControl() {
 void runLEDControl() {
     static uint8_t prevLEDState = 255; // Initialize with an invalid state to force first update
     static uint8_t prevLEDBrightness = 101; // Track previous brightness
+    static String prevLEDColor = ""; // Track previous color
     
     // Process LED button input
     handleLEDButton(childLockOn);
     
-    // Read current LED state and brightness
+    // Read current LED state, brightness, and color
     uint8_t currentLEDState = getLEDState();
     uint8_t currentLEDBrightness = getLEDBrightness();
+    String currentLEDColor = getLEDColor();
     
     // Update BLE LED status if the LED state has changed
     if (prevLEDState != currentLEDState) {
@@ -169,6 +171,15 @@ void runLEDControl() {
         // Update previous brightness for next iteration
         prevLEDBrightness = currentLEDBrightness;
     }
+    
+    // Update BLE LED color if the color has changed
+    if (prevLEDColor != currentLEDColor) {
+        // Update BLE
+        bleControl.updateLEDColor(currentLEDColor);
+        
+        // Update previous color for next iteration
+        prevLEDColor = currentLEDColor;
+    }
 }
 
 // Print debug information to serial console
@@ -186,11 +197,14 @@ void printDebugInfo() {
         Serial.print(getStateDescription(currentState));
         Serial.print(" (");
         Serial.print(currentState);
+        Serial.println(")");
         Serial.print("LED State: ");
         Serial.print(getLEDState() == LED_STATE_ON ? "ON" : "OFF");
         Serial.print("LED Brightness: ");
         Serial.println(getLEDBrightness());
         Serial.println(")");
+        Serial.print("LED Color: ");
+        Serial.println(getLEDColor());
         Serial.print("Target: ");
         Serial.println(podOpenFlag ? "OPENING/OPEN" : "CLOSING/CLOSED");
         Serial.print("Child Lock: ");

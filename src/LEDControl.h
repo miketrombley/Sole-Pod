@@ -22,7 +22,10 @@ void setLEDState(uint8_t state);
 uint8_t getLEDState();
 void setLEDBrightness(uint8_t brightness);
 uint8_t getLEDBrightness();
+void setLEDColor(String colorHex);
+String getLEDColor();
 
 extern uint8_t ledBrightness;
+extern String ledColorHex;
 
 #endif // LED_CONTROL_H
