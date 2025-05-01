@@ -48,6 +48,14 @@ void saveLEDState(uint8_t ledState) {
     Serial.print("LED State saved: ");
     Serial.println(ledState == 1 ? "ON" : "OFF");
 }
+void saveDoorStatus(bool doorOpen) {
+    preferences.begin(SETTINGS_NAMESPACE, false);
+    preferences.putBool("doorStatus", doorOpen);
+    preferences.end();
+    
+    Serial.print("Door Status saved: ");
+    Serial.println(doorOpen ? "OPEN" : "CLOSED");
+}
 
 
 // Renamed getter functions to avoid naming conflicts
@@ -80,9 +88,16 @@ uint8_t getSavedLEDState(uint8_t defaultState) {
     return state;
 }
 
+bool getSavedDoorStatus(bool defaultStatus) {
+    preferences.begin(SETTINGS_NAMESPACE, true);
+    bool status = preferences.getBool("doorStatus", defaultStatus);
+    preferences.end();
+    return status;
+}
+
 // Function to load all settings at once during startup
 bool loadAllSettings(String &ledColor, uint8_t &ledBrightness, 
-                    uint8_t &doorPosition, uint8_t &ledState) {
+                    uint8_t &doorPosition, uint8_t &ledState, bool &doorStatus) {
     bool settingsExist = false;
     
     preferences.begin(SETTINGS_NAMESPACE, true);
@@ -95,6 +110,7 @@ bool loadAllSettings(String &ledColor, uint8_t &ledBrightness,
     ledBrightness = preferences.getUChar("ledBright", 100);
     doorPosition = preferences.getUChar("doorPos", 100);
     ledState = preferences.getUChar("ledState", 0); // Default to OFF (0)
+    doorStatus = preferences.getBool("doorStatus", false); // Default to CLOSED
     
     preferences.end();
     
@@ -108,6 +124,8 @@ bool loadAllSettings(String &ledColor, uint8_t &ledBrightness,
         Serial.println(doorPosition);
         Serial.print("LED State: ");
         Serial.println(ledState == 1 ? "ON" : "OFF");
+        Serial.print("Door Status: ");
+        Serial.println(doorStatus ? "OPEN" : "CLOSED");
     } else {
         Serial.println("No saved settings found, using defaults");
     }

@@ -92,13 +92,16 @@ void setupSystem() {
     uint8_t savedLedBrightness;
     uint8_t savedDoorPosition;
     uint8_t savedLedState;
+    bool savedDoorStatus;
     
-    if (loadAllSettings(savedLedColor, savedLedBrightness, savedDoorPosition, savedLedState)) {
+    if (loadAllSettings(savedLedColor, savedLedBrightness, savedDoorPosition, 
+                       savedLedState, savedDoorStatus)) {
         // Apply loaded settings to the global variables
         ledColorHex = savedLedColor;
         ledBrightness = savedLedBrightness;
         doorPosition = savedDoorPosition;
         // No need to set lightState here - we'll call setLEDState after initialization
+        podOpenFlag = savedDoorStatus; // Set the door status based on saved value
     }
     
     // Initialize LED control
@@ -115,7 +118,7 @@ void setupSystem() {
 void runDoorControl() {
     static uint8_t prevState = POD_STATE_UNDEFINED;
     static bool prevOpenFlag = false;
-    static uint8_t prevDoorPosition = 0; // Add this line
+    static uint8_t prevDoorPosition = 0; 
     
     // Process door button input
     handleDoorButton(podOpenFlag, childLockOn);
@@ -123,7 +126,7 @@ void runDoorControl() {
     
     // Read current door state
     uint8_t currentState = readState();
-    uint8_t currentDoorPosition = getDoorPosition(); // Add this line
+    uint8_t currentDoorPosition = getDoorPosition();
     
     // Update BLE door status if:
     // 1. The physical door state has changed OR
@@ -148,6 +151,11 @@ void runDoorControl() {
         
         // Update BLE status
         bleControl.updateDoorStatus(doorIsOpenForBLE);
+        
+        // Save door status if the flag has changed
+        if (prevOpenFlag != podOpenFlag) {
+            saveDoorStatus(podOpenFlag);
+        }
         
         // Update previous values for next iteration
         prevState = currentState;
