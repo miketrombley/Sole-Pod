@@ -133,10 +133,24 @@ void runDoorControl() {
     }
 }
 
-// Handle LED related functionality
+// Handle LED related functionality including BLE updates
 void runLEDControl() {
+    static uint8_t prevLEDState = 255; // Initialize with an invalid state to force first update
+    
     // Process LED button input
     handleLEDButton(childLockOn);
+    
+    // Read current LED state
+    uint8_t currentLEDState = getLEDState();
+    
+    // Update BLE LED status if the LED state has changed
+    if (prevLEDState != currentLEDState) {
+        // Update BLE
+        bleControl.updateLEDStatus(currentLEDState);
+        
+        // Update previous state for next iteration
+        prevLEDState = currentLEDState;
+    }
 }
 
 // Print debug information to serial console
