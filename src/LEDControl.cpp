@@ -68,6 +68,9 @@ void setLEDState(uint8_t state) {
     
     // Update the physical LED
     FastLED.show();
+
+    // Save the state change
+    saveLEDState(lightState);
 }
 
 uint8_t getLEDState() {
@@ -94,6 +97,9 @@ void setLEDBrightness(uint8_t brightness) {
     Serial.print("LED brightness set to: ");
     Serial.print(ledBrightness);
     Serial.println("%");
+
+    // Save only the brightness setting
+    saveLEDBrightness(ledBrightness);
 }
 
 uint8_t getLEDBrightness() {
@@ -143,6 +149,9 @@ void setLEDColor(String colorHex) {
     else {
         Serial.println("Invalid color format! Expected 6 or 8 character hex string.");
     }
+
+    // Save only the color setting
+    saveLEDColor(ledColorHex);
 }
 
 // Add this new function to get LED color

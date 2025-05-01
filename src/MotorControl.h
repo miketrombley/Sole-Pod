@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include "Sensors.h" // Include Sensors.h to access state definitions
+#include "SystemSettings.h"
 
 // Define motor control pins
 #define DOOR_MOTOR 46          // Door motor control pin (1=on, 0=off)

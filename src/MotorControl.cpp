@@ -156,6 +156,9 @@ void setDoorPosition(uint8_t position) {
         doorPosition = position;
         Serial.print("Door position set to: ");
         Serial.println(doorPosition);
+        
+        // Save only the door position setting
+        saveDoorPosition(doorPosition);
     } else {
         Serial.println("Invalid door position! Only 50 or 100 allowed.");
     }

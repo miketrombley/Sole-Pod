@@ -2,6 +2,7 @@
 #define LED_CONTROL_H
 
 #include <FastLED.h>
+#include "SystemSettings.h"
 
 // Define LED data pins and configuration
 #define LED_DATA_PIN 14        // Data pin for the LEDs

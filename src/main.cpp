@@ -16,7 +16,8 @@ tray motors, LED lighting, safety sensors, and BLE connectivity.
 #include "Sensors.h"
 #include "LEDControl.h"
 #include "VoltageReader.h"
-#include "BLEControl.h" // Add BLEControl header
+#include "BLEControl.h" 
+#include "SystemSettings.h"
 
 // Configuration settings
 #define DEBUG_MODE true       // Enable/disable debug messages
@@ -73,7 +74,6 @@ void loop() {
     delay(LOOP_DELAY_MS);
 }
 
-// Initialize all subsystems
 void setupSystem() {
     // Initialize sensors
     initSwitches();
@@ -84,8 +84,28 @@ void setupSystem() {
     // Initialize voltage monitoring
     initVoltageReader();
     
+    // Initialize settings module
+    initSettings();
+    
+    // Load saved settings
+    String savedLedColor;
+    uint8_t savedLedBrightness;
+    uint8_t savedDoorPosition;
+    uint8_t savedLedState;
+    
+    if (loadAllSettings(savedLedColor, savedLedBrightness, savedDoorPosition, savedLedState)) {
+        // Apply loaded settings to the global variables
+        ledColorHex = savedLedColor;
+        ledBrightness = savedLedBrightness;
+        doorPosition = savedDoorPosition;
+        // No need to set lightState here - we'll call setLEDState after initialization
+    }
+    
     // Initialize LED control
     initLEDs();
+    
+    // Explicitly set the LED state based on saved setting (defaults to OFF)
+    setLEDState(savedLedState);
     
     // Initialize BLE control
     bleControl.begin();
