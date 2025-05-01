@@ -12,6 +12,7 @@ uint8_t lightState = LED_STATE_OFF; // 0 = Light Off, 1 = Light On
 void initLEDs() {
     // Initialize FastLED with the LED strip configuration
     FastLED.addLeds<WS2812, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
+    FastLED.setBrightness(255); // Set global brightness to 100% (255 is max)
     FastLED.clear(); // Ensure the LED is off initially
     FastLED.show();
 
