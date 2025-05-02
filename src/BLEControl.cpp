@@ -64,9 +64,13 @@ void BLEControl::begin() {
     // Initialize BLE
     BLEDevice::init("Sole Pod");
     pServer = BLEDevice::createServer();
+    
 
     // Create BLE Service
     BLEService* pService = pServer->createService(UUID_SERVICE);
+
+    // Set up the server callbacks
+    pServer->setCallbacks(new ServerCallbacks());
 
     // Create Door Status Characteristic
     pDoorStatus = pService->createCharacteristic(
@@ -337,6 +341,7 @@ void BLEControl::onNetworkReceived(const std::string& value) {
     int passwordIndex = data.indexOf("ENDPASSWORD");
     if (networkIndex != -1 && passwordIndex != -1) {
         // Extract the network SSID and password
+        // Assuming the format is "SSIDENDNETWORKPASSWORDENDPASSWORD"
         String ssid = data.substring(0, networkIndex); // Everything before "ENDNETWORK"
         String password = data.substring(networkIndex + 10, passwordIndex); // Between "ENDNETWORK" and "ENDPASSWORD"
         
@@ -383,4 +388,19 @@ void BLEControl::updateWiFiStatus(const String& status) {
         Serial.print("BLE WiFi Status updated: ");
         Serial.println(status);
     }
+}
+
+void ServerCallbacks::onConnect(BLEServer* pServer) {
+    Serial.println("Client connected to BLE");
+}
+
+void ServerCallbacks::onDisconnect(BLEServer* pServer) {
+    Serial.println("Client disconnected - restarting advertising");
+    BLEDevice::startAdvertising();
+}
+
+void BLEControl::restartAdvertising() {
+    BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
+    pAdvertising->start();
+    Serial.println("BLE advertising restarted");
 }
