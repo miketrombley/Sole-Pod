@@ -18,6 +18,7 @@ tray motors, LED lighting, safety sensors, and BLE connectivity.
 #include "VoltageReader.h"
 #include "BLEControl.h" 
 #include "SystemSettings.h"
+#include "WiFiControl.h"
 
 // Configuration settings
 #define DEBUG_MODE true       // Enable/disable debug messages
@@ -27,13 +28,21 @@ tray motors, LED lighting, safety sensors, and BLE connectivity.
 bool childLockOn = false;     // Child lock status (true = locked)
 bool podOpenFlag = false;     // Pod position flag (true = open, false = closed)
 
+// SSID and password to store
+const char* defaultSSID = "Pizza King";
+const char* defaultPassword = "10000000";
+
 // Create BLE Control instance
 BLEControl bleControl(&podOpenFlag); // Pass a reference to podOpenFlag
+
+// Create WiFi controller instance
+WiFiControl wifiControl;
 
 // Function prototypes
 void setupSystem();
 void runDoorControl();
 void runLEDControl();
+void runWiFiControl();  // New function for WiFi monitoring
 void printDebugInfo();
 
 void setup() {
@@ -47,6 +56,22 @@ void setup() {
     
     // Initialize all subsystems
     setupSystem();
+    
+    // Initialize WiFi connection with stored credentials
+    if (DEBUG_MODE) {
+        Serial.println("Initializing WiFi connection...");
+    }
+    
+    if (wifiControl.connectWiFi(defaultSSID, defaultPassword)) {
+        if (DEBUG_MODE) {
+            Serial.println("Successfully connected to WiFi!");
+            Serial.printf("Network: %s\n", wifiControl.getCurrentSSID().c_str());
+            Serial.printf("IP Address: %s\n", wifiControl.getLocalIP().toString().c_str());
+            Serial.printf("Signal Strength: %d dBm\n", wifiControl.getSignalStrength());
+        }
+    } else if (DEBUG_MODE) {
+        Serial.println("Failed to connect to WiFi. Check credentials or network availability.");
+    }
     
     if (DEBUG_MODE) {
         Serial.println("System initialization complete!");
@@ -65,6 +90,9 @@ void loop() {
     // Handle LED control functionality
     runLEDControl();
     
+    // Handle WiFi connection monitoring
+    runWiFiControl();
+    
     // Print debug information if enabled
     if (DEBUG_MODE) {
         printDebugInfo();
@@ -72,6 +100,23 @@ void loop() {
     
     // Small delay to stabilize loop timing
     delay(LOOP_DELAY_MS);
+}
+
+// New function to monitor and maintain WiFi connection
+void runWiFiControl() {
+    static unsigned long lastWiFiCheckTime = 0;
+    const unsigned long WIFI_CHECK_INTERVAL = 30000; // Check every 30 seconds
+    
+    // Only check periodically to avoid constant checking
+    if (millis() - lastWiFiCheckTime >= WIFI_CHECK_INTERVAL) {
+        if (wifiControl.getWiFiStatus() != WL_CONNECTED) {
+            if (DEBUG_MODE) {
+                Serial.println("WiFi connection lost! Attempting to reconnect...");
+            }
+            wifiControl.connectWiFi(wifiControl.getCurrentSSID(), wifiControl.getCurrentPassword());
+        }
+        lastWiFiCheckTime = millis();
+    }
 }
 
 void setupSystem() {
@@ -254,6 +299,20 @@ void printDebugInfo() {
         Serial.println(isTrayClose() ? "ACTIVE" : "INACTIVE");
         Serial.print("  Tray Open: ");
         Serial.println(isTrayOpen() ? "ACTIVE" : "INACTIVE");
+        
+        // Add WiFi status to debug info
+        Serial.print("WiFi Status: ");
+        Serial.println(wifiControl.getWiFiStatusString());
+        if (wifiControl.getWiFiStatus() == WL_CONNECTED) {
+            Serial.print("Network: ");
+            Serial.println(wifiControl.getCurrentSSID());
+            Serial.print("IP Address: ");
+            Serial.println(wifiControl.getLocalIP().toString());
+            Serial.print("Signal Strength: ");
+            Serial.print(wifiControl.getSignalStrength());
+            Serial.println(" dBm");
+        }
+        
         Serial.println("-------------------");
         
         lastDebugTime = millis();
