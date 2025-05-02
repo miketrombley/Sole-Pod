@@ -40,11 +40,6 @@ public:
     void onRead(BLECharacteristic* characteristic) override;
 };
 
-class ServerCallbacks: public BLEServerCallbacks {
-    void onConnect(BLEServer* pServer);
-    void onDisconnect(BLEServer* pServer);
-};
-
 class BLEControl {
 private:
     BLEServer* pServer;
@@ -112,11 +107,6 @@ public:
     
     // Updates the BLE characteristic with current WiFi status
     void updateWiFiStatus(const String& status);
-
-    // Updates the BLE characteristic with current WiFi signal strength
-    void onConnect(BLEServer* pServer);
-    void onDisconnect(BLEServer* pServer);
-    void restartAdvertising();
 };
 
 #endif // BLECONTROL_H
