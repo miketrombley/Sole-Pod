@@ -23,12 +23,17 @@ void BLECharacteristicCallback::onWrite(BLECharacteristic* characteristic) {
     else if (uuid == UUID_LIGHTS_COLOR) {
         bleControl->handleLEDColorWrite(characteristic);
     }
+    else if (uuid == UUID_WIFI_CREDENTIALS) {
+        bleControl->handleWiFiCredentialsWrite(characteristic);
+    }
 }
 
 void BLECharacteristicCallback::onRead(BLECharacteristic* characteristic) {
+    // Ensure the BLEControl reference is valid
     std::string uuid = characteristic->getUUID().toString();
     std::string value = characteristic->getValue();
     
+    // Print the value read from the characteristic
     if (uuid == UUID_DOOR_STATUS) {
         Serial.print("BLE Client read door status: ");
         Serial.println(value.c_str());
@@ -52,10 +57,7 @@ void BLECharacteristicCallback::onRead(BLECharacteristic* characteristic) {
 }
 
 // BLEControl constructor that takes a reference to the podOpenFlag
-BLEControl::BLEControl(bool* podOpenFlag) 
-    : pServer(nullptr), pDoorStatus(nullptr), pDoorPosition(nullptr), 
-      pLEDStatus(nullptr), pLEDBrightness(nullptr), pLEDColor(nullptr), 
-      podOpenFlagRef(podOpenFlag) {
+BLEControl::BLEControl(bool* podOpenFlag, WiFiControl* wifiControl) : pServer(nullptr), pDoorStatus(nullptr), pDoorPosition(nullptr), pLEDStatus(nullptr), pLEDBrightness(nullptr), pLEDColor(nullptr),pWiFiCredentials(nullptr), pWiFiStatus(nullptr), podOpenFlagRef(podOpenFlag), wifiControlRef(wifiControl),networkBuffer(""), passwordBuffer("") {
 }
 
 void BLEControl::begin() {
@@ -101,6 +103,19 @@ void BLEControl::begin() {
     );
     pLEDColor->setCallbacks(new BLECharacteristicCallback(this, UUID_LIGHTS_COLOR));
     
+    // Create WiFi Credentials Characteristic (write-only)
+    pWiFiCredentials = pService->createCharacteristic(
+        UUID_WIFI_CREDENTIALS, 
+        BLECharacteristic::PROPERTY_WRITE
+    );
+    pWiFiCredentials->setCallbacks(new BLECharacteristicCallback(this, UUID_WIFI_CREDENTIALS));
+    
+    // Create WiFi Status Characteristic (read-only)
+    pWiFiStatus = pService->createCharacteristic(
+        UUID_WIFI_STATUS, 
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
+    );
+    
     // Set initial values based on current states
     updateDoorStatus(*podOpenFlagRef);
     updateDoorPosition(getDoorPosition());
@@ -112,6 +127,9 @@ void BLEControl::begin() {
     
     // Set initial color
     updateLEDColor(getLEDColor());
+    
+    // Set initial WiFi status
+    updateWiFiStatus(wifiControlRef->getWiFiStatusString());
 
     // Start the service
     pService->start();
@@ -303,5 +321,66 @@ void BLEControl::updateLEDColor(String color) {
         pLEDColor->setValue(color.c_str());
         Serial.print("BLE LED Color updated: ");
         Serial.println(color);
+    }
+}
+
+void BLEControl::handleWiFiCredentialsWrite(BLECharacteristic* characteristic) {
+    if (characteristic == pWiFiCredentials) {
+        std::string value = characteristic->getValue();
+        onNetworkReceived(value);
+    }
+}
+
+void BLEControl::onNetworkReceived(const std::string& value) {
+    String data = String(value.c_str());
+    int networkIndex = data.indexOf("ENDNETWORK");
+    int passwordIndex = data.indexOf("ENDPASSWORD");
+    if (networkIndex != -1 && passwordIndex != -1) {
+        // Extract the network SSID and password
+        String ssid = data.substring(0, networkIndex); // Everything before "ENDNETWORK"
+        String password = data.substring(networkIndex + 10, passwordIndex); // Between "ENDNETWORK" and "ENDPASSWORD"
+        
+        networkBuffer = ssid;  // Store the SSID
+        passwordBuffer = password;  // Store the password
+        Serial.printf("Received Network SSID: %s\n", ssid.c_str());
+        Serial.printf("Received Password: %s\n", password.c_str());
+        
+        finalizeNetwork();  // After receiving both, attempt to connect to Wi-Fi
+    } else {
+        Serial.println("Invalid format, missing ENDNETWORK or ENDPASSWORD.");
+    }
+}
+
+void BLEControl::finalizeNetwork() {
+    if (networkBuffer.length() > 0 && passwordBuffer.length() > 0) {
+        // Attempt to connect to WiFi with new credentials
+        Serial.println("Attempting to connect to WiFi with new credentials...");
+        
+        bool connected = wifiControlRef->updateWiFiCredentials(networkBuffer, passwordBuffer);
+        
+        // Clear buffers after connection attempt
+        String status;
+        if (connected) {
+            status = "CONNECTED:" + networkBuffer + ":" + wifiControlRef->getLocalIP().toString();
+            Serial.println("WiFi connection successful!");
+        } else {
+            status = "FAILED:" + networkBuffer;
+            Serial.println("WiFi connection failed!");
+        }
+        
+        // Update the WiFi status characteristic
+        updateWiFiStatus(status);
+        
+        // Clear buffers
+        networkBuffer = "";
+        passwordBuffer = "";
+    }
+}
+
+void BLEControl::updateWiFiStatus(const String& status) {
+    if (pWiFiStatus) {
+        pWiFiStatus->setValue(status.c_str());
+        Serial.print("BLE WiFi Status updated: ");
+        Serial.println(status);
     }
 }

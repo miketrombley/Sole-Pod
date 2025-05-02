@@ -29,14 +29,14 @@ bool childLockOn = false;     // Child lock status (true = locked)
 bool podOpenFlag = false;     // Pod position flag (true = open, false = closed)
 
 // SSID and password to store
-const char* defaultSSID = "Pizza King";
-const char* defaultPassword = "10000000";
-
-// Create BLE Control instance
-BLEControl bleControl(&podOpenFlag); // Pass a reference to podOpenFlag
+const char* defaultSSID = "";
+const char* defaultPassword = "";
 
 // Create WiFi controller instance
 WiFiControl wifiControl;
+
+// Update BLEControl instantiation
+BLEControl bleControl(&podOpenFlag, &wifiControl);
 
 // Function prototypes
 void setupSystem();
@@ -102,19 +102,36 @@ void loop() {
     delay(LOOP_DELAY_MS);
 }
 
-// New function to monitor and maintain WiFi connection
 void runWiFiControl() {
     static unsigned long lastWiFiCheckTime = 0;
+    static String lastWiFiStatus = "";
     const unsigned long WIFI_CHECK_INTERVAL = 30000; // Check every 30 seconds
     
     // Only check periodically to avoid constant checking
     if (millis() - lastWiFiCheckTime >= WIFI_CHECK_INTERVAL) {
-        if (wifiControl.getWiFiStatus() != WL_CONNECTED) {
-            if (DEBUG_MODE) {
-                Serial.println("WiFi connection lost! Attempting to reconnect...");
+        String currentStatus;
+        
+        if (wifiControl.getWiFiStatus() == WL_CONNECTED) {
+            currentStatus = "CONNECTED:" + wifiControl.getCurrentSSID() + ":" + 
+                           wifiControl.getLocalIP().toString();
+        } else {
+            currentStatus = "DISCONNECTED";
+            
+            if (wifiControl.getCurrentSSID().length() > 0) {
+                // Try to reconnect if we have credentials
+                if (DEBUG_MODE) {
+                    Serial.println("WiFi connection lost! Attempting to reconnect...");
+                }
+                wifiControl.connectWiFi(wifiControl.getCurrentSSID(), wifiControl.getCurrentPassword());
             }
-            wifiControl.connectWiFi(wifiControl.getCurrentSSID(), wifiControl.getCurrentPassword());
         }
+        
+        // Only update BLE characteristic if status changed
+        if (lastWiFiStatus != currentStatus) {
+            bleControl.updateWiFiStatus(currentStatus);
+            lastWiFiStatus = currentStatus;
+        }
+        
         lastWiFiCheckTime = millis();
     }
 }

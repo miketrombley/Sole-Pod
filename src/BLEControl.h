@@ -7,6 +7,7 @@
 #include <BLECharacteristic.h>
 #include <BLEService.h>
 #include <BLEAdvertising.h>
+#include "WiFiControl.h" // Add this include
 
 // Define Service and Characteristic UUIDs
 #define UUID_SERVICE           "7d840001-11eb-4c13-89f2-246b6e0b0000"
@@ -15,6 +16,8 @@
 #define UUID_LIGHTS            "7d840004-11eb-4c13-89f2-246b6e0b0003"
 #define UUID_LIGHTS_BRIGHTNESS "7d840005-11eb-4c13-89f2-246b6e0b0004"
 #define UUID_LIGHTS_COLOR      "7d840006-11eb-4c13-89f2-246b6e0b0005"
+#define UUID_WIFI_CREDENTIALS  "7d840007-11eb-4c13-89f2-246b6e0b0006"
+#define UUID_WIFI_STATUS       "7d840008-11eb-4c13-89f2-246b6e0b0007"
 
 // Valid ranges for BLE characteristics
 #define MIN_BRIGHTNESS 0
@@ -45,12 +48,22 @@ private:
     BLECharacteristic* pLEDStatus;
     BLECharacteristic* pLEDBrightness;
     BLECharacteristic* pLEDColor;
+    BLECharacteristic* pWiFiCredentials;
+    BLECharacteristic* pWiFiStatus;
     
     // Reference to external state flag to control door state
     bool* podOpenFlagRef;
+    
+    // Reference to WiFi controller
+    WiFiControl* wifiControlRef;
+    
+    // Network credentials buffers
+    String networkBuffer;
+    String passwordBuffer;
 
 public:
-    BLEControl(bool* podOpenFlag);
+    // Updated constructor to include WiFiControl reference
+    BLEControl(bool* podOpenFlag, WiFiControl* wifiControl);
     void begin();
     
     // Handler for door status characteristic changes
@@ -68,6 +81,15 @@ public:
     // Handler for LED color characteristic changes
     void handleLEDColorWrite(BLECharacteristic* characteristic);
     
+    // Handler for WiFi credentials characteristic changes
+    void handleWiFiCredentialsWrite(BLECharacteristic* characteristic);
+    
+    // Helper method to process received network info
+    void onNetworkReceived(const std::string& value);
+    
+    // Method to attempt WiFi connection with stored credentials
+    void finalizeNetwork();
+    
     // Updates the BLE characteristic based on the current door state
     void updateDoorStatus(bool isOpen);
 
@@ -82,6 +104,9 @@ public:
     
     // Updates the BLE characteristic based on the current LED color
     void updateLEDColor(String color);
+    
+    // Updates the BLE characteristic with current WiFi status
+    void updateWiFiStatus(const String& status);
 };
 
 #endif // BLECONTROL_H
