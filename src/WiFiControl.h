@@ -40,6 +40,17 @@ public:
                 return "Unknown status";
         }
     }
+
+    // Begins the WiFi connection process without waiting for it to complete
+    void beginConnection(const String& newSSID, const String& newPassword) {
+        // Update stored credentials
+        ssid = newSSID;
+        password = newPassword;
+        
+        // Start connection attempt without waiting
+        Serial.printf("Starting WiFi connection to: %s\n", ssid.c_str());
+        WiFi.begin(ssid.c_str(), password.c_str());
+    }
     
     // Attempts to connect to WiFi with the provided credentials
     // Returns true if connection was successful, false otherwise
