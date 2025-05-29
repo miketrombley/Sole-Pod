@@ -1,7 +1,7 @@
 #ifndef LED_CONTROL_H
 #define LED_CONTROL_H
 
-#include <FastLED.h>
+#include <Adafruit_NeoPixel.h>
 #include "SystemSettings.h"
 
 // Define LED data pins and configuration

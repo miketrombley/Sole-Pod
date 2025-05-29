@@ -1,7 +1,7 @@
 #include "LEDControl.h"
 
-// Create the RGB Object
-CRGB leds[NUM_LEDS];
+// Create the NeoPixel strip object
+Adafruit_NeoPixel strip(NUM_LEDS, LED_DATA_PIN, NEO_GRB + NEO_KHZ800);
 
 // Previous state of the LED button
 bool previousLedBtnState = HIGH;
@@ -12,11 +12,11 @@ uint8_t ledBrightness = MAX_BRIGHTNESS; // Default to full brightness (100%)
 String ledColorHex = "0000FF"; // Default to blue color
 
 void initLEDs() {
-    // Initialize FastLED with the LED strip configuration
-    FastLED.addLeds<WS2812, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
-    FastLED.setBrightness(255); // Set global brightness to 100% (255 is max)
-    FastLED.clear(); // Ensure the LED is off initially
-    FastLED.show();
+    // Initialize NeoPixel strip
+    strip.begin();
+    strip.setBrightness(255); // Set global brightness to 100% (255 is max)
+    strip.clear(); // Ensure the LED is off initially
+    strip.show();
 
     // Initialize LED button pin as input with internal pull-up resistor
     pinMode(LED_BTN, INPUT_PULLUP);
@@ -54,20 +54,23 @@ void setLEDState(uint8_t state) {
         uint8_t r = strtol(ledColorHex.substring(0, 2).c_str(), nullptr, 16);
         uint8_t g = strtol(ledColorHex.substring(2, 4).c_str(), nullptr, 16);
         uint8_t b = strtol(ledColorHex.substring(4, 6).c_str(), nullptr, 16);
-        leds[0] = CRGB(r, g, b);
         
-        // Scale brightness from 0-100 to 0-255 for FastLED
+        // Set the pixel color
+        //strip.setPixelColor(0, r, g, b);
+        strip.setPixelColor(0, 0, 255, 255);
+        
+        // Scale brightness from 0-100 to 0-255 for NeoPixel
         uint8_t scaledBrightness = map(ledBrightness, 0, 100, 0, 255);
-        FastLED.setBrightness(scaledBrightness);
+        strip.setBrightness(scaledBrightness);
         Serial.println("LED turned ON");
     } else {
         // Turn off the LED
-        leds[0] = CRGB::Black;
+        strip.setPixelColor(0, 0, 0, 0);
         Serial.println("LED turned OFF");
     }
     
     // Update the physical LED
-    FastLED.show();
+    strip.show();
 
     // Save the state change
     saveLEDState(lightState);
@@ -88,10 +91,10 @@ void setLEDBrightness(uint8_t brightness) {
     
     // Update the physical LED if it's on
     if (lightState == LED_STATE_ON) {
-        // Scale brightness from 0-100 to 0-255 for FastLED
+        // Scale brightness from 0-100 to 0-255 for NeoPixel
         uint8_t scaledBrightness = map(ledBrightness, 0, 100, 0, 255);
-        FastLED.setBrightness(scaledBrightness);
-        FastLED.show();
+        strip.setBrightness(scaledBrightness);
+        strip.show();
     }
     
     Serial.print("LED brightness set to: ");
@@ -124,8 +127,8 @@ void setLEDColor(String colorHex) {
         
         // Set the LED color if it's on
         if (lightState == LED_STATE_ON) {
-            leds[0] = CRGB(r, g, b);
-            FastLED.show();
+            strip.setPixelColor(0, r, g, b);
+            strip.show();
         }
         
         Serial.printf("LED color set to R:%d G:%d B:%d\n", r, g, b);
@@ -140,8 +143,8 @@ void setLEDColor(String colorHex) {
         
         // Set the LED color if it's on
         if (lightState == LED_STATE_ON) {
-            leds[0] = CRGB(r, g, b);
-            FastLED.show();
+            strip.setPixelColor(0, r, g, b);
+            strip.show();
         }
         
         Serial.printf("LED color set to R:%d G:%d B:%d\n", r, g, b);

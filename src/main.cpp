@@ -11,7 +11,6 @@ tray motors, LED lighting, safety sensors, and BLE connectivity.
 */
 
 #include <Arduino.h>
-#include <FastLED.h>
 #include "MotorControl.h"
 #include "Sensors.h"
 #include "LEDControl.h"

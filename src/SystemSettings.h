@@ -18,7 +18,7 @@ void saveLEDState(uint8_t ledState); // New function
 void saveDoorStatus(bool doorOpen);
 
 // Renamed getter functions to avoid naming conflicts
-String getSavedLEDColor(String defaultColor = "0000FF");
+String getSavedLEDColor(String defaultColor = "FFFFFF");
 uint8_t getSavedLEDBrightness(uint8_t defaultBrightness = 100);
 uint8_t getSavedDoorPosition(uint8_t defaultPosition = 100);
 uint8_t getSavedLEDState(uint8_t defaultState = 0); // Use raw value 0 instead of LED_STATE_OFF
