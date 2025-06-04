@@ -320,11 +320,14 @@ void runLEDControl() {
 // Print debug information to serial console
 void printDebugInfo() {
     static unsigned long lastDebugTime = 0;
+    static bool lastBLEConnectionStatus = false;
+    bool currentBLEStatus = bleControl.getConnectionStatus(); // Get BLE status
     
     // Only update debug info every 500ms to avoid flooding serial
-    if (millis() - lastDebugTime > 1000) {
+    if (millis() - lastDebugTime > 5000) {
         uint8_t currentState = readState();
         float voltage = readAverageVoltage();
+        
         
         Serial.println("--- System Status ---");
         
@@ -373,6 +376,16 @@ void printDebugInfo() {
             Serial.print("Signal Strength: ");
             Serial.print(wifiControl.getSignalStrength());
             Serial.println(" dBm");
+        }
+
+        // Detect BLE connection changes
+        if (lastBLEConnectionStatus != currentBLEStatus) {
+            if (currentBLEStatus) {
+                Serial.println("*** BLE CLIENT CONNECTED ***");
+            } else {
+                Serial.println("*** BLE CLIENT DISCONNECTED - ADVERTISING RESUMED ***");
+            }
+            lastBLEConnectionStatus = currentBLEStatus;
         }
         
         Serial.println("-------------------");

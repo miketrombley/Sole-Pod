@@ -7,7 +7,7 @@
 #include <BLECharacteristic.h>
 #include <BLEService.h>
 #include <BLEAdvertising.h>
-#include "WiFiControl.h" // Add this include
+#include "WiFiControl.h"
 
 // Define Service and Characteristic UUIDs
 #define UUID_SERVICE           "7d840001-11eb-4c13-89f2-246b6e0b0000"
@@ -24,8 +24,20 @@
 #define MIN_BRIGHTNESS 0
 #define MAX_BRIGHTNESS 100
 
-// Forward declaration
+// Forward declarations
 class BLEControl;
+
+// BLE Server callback class to handle connections
+class BLEServerCallback : public BLEServerCallbacks {
+private:
+    BLEControl* bleControl;
+
+public:
+    BLEServerCallback(BLEControl* control) : bleControl(control) {}
+    
+    void onConnect(BLEServer* pServer) override;
+    void onDisconnect(BLEServer* pServer) override;
+};
 
 // Generic callback class for BLE characteristics
 class BLECharacteristicCallback : public BLECharacteristicCallbacks {
@@ -44,6 +56,7 @@ public:
 class BLEControl {
 private:
     BLEServer* pServer;
+    BLEAdvertising* pAdvertising;
     BLECharacteristic* pDoorStatus;
     BLECharacteristic* pDoorPosition;
     BLECharacteristic* pLEDStatus;
@@ -52,6 +65,10 @@ private:
     BLECharacteristic* pWiFiCredentials;
     BLECharacteristic* pWiFiStatus;
     BLECharacteristic* pChildLock;
+    
+    // Connection state tracking
+    bool isClientConnected;
+    uint16_t connectedClientId;
     
     // Reference to external state flag to control door state
     bool* podOpenFlagRef;
@@ -67,56 +84,45 @@ private:
     String passwordBuffer;
 
 public:
-    // Updated constructor to include WiFiControl reference and child lock reference
+    // Constructor
     BLEControl(bool* podOpenFlag, WiFiControl* wifiControl, bool* childLock);
+    
+    // Main initialization
     void begin();
     
-    // Handler for door status characteristic changes
+    // Connection management
+    void startAdvertising();
+    void stopAdvertising();
+    bool getConnectionStatus() const { return isClientConnected; }
+    
+    // Internal setup methods
+    void createCharacteristics(BLEService* pService);
+    void setInitialValues();
+    
+    // Connection event handlers (called by BLEServerCallback)
+    void handleClientConnect(uint16_t clientId);
+    void handleClientDisconnect();
+    
+    // Characteristic write handlers
     void handleDoorStatusWrite(BLECharacteristic* characteristic);
-
-    // Handler for door position characteristic changes
     void handleDoorPositionWrite(BLECharacteristic* characteristic);
-    
-    // Handler for LED status characteristic changes
     void handleLEDStatusWrite(BLECharacteristic* characteristic);
-    
-    // Handler for LED brightness characteristic changes
     void handleLEDBrightnessWrite(BLECharacteristic* characteristic);
-    
-    // Handler for LED color characteristic changes
     void handleLEDColorWrite(BLECharacteristic* characteristic);
-    
-    // Handler for WiFi credentials characteristic changes
     void handleWiFiCredentialsWrite(BLECharacteristic* characteristic);
-    
-    // Handler for child lock characteristic changes
     void handleChildLockWrite(BLECharacteristic* characteristic);
     
-    // Helper method to process received network info
+    // Helper methods
     void onNetworkReceived(const std::string& value);
-    
-    // Method to attempt WiFi connection with stored credentials
     void finalizeNetwork();
     
-    // Updates the BLE characteristic based on the current door state
+    // BLE characteristic update methods
     void updateDoorStatus(bool isOpen);
-
-    // Updates the BLE characteristic based on the current door position
     void updateDoorPosition(uint8_t position);
-    
-    // Updates the BLE characteristic based on the current LED state
     void updateLEDStatus(uint8_t ledState);
-    
-    // Updates the BLE characteristic based on the current LED brightness
     void updateLEDBrightness(uint8_t brightness);
-    
-    // Updates the BLE characteristic based on the current LED color
     void updateLEDColor(String color);
-    
-    // Updates the BLE characteristic with current WiFi status
     void updateWiFiStatus(const String& status);
-    
-    // Updates the BLE characteristic based on the current child lock state
     void updateChildLock(bool childLockOn);
 };
 

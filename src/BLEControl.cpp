@@ -2,7 +2,21 @@
 #include "MotorControl.h"
 #include "LEDControl.h"
 
-// Implement generic callback functions
+// BLE Server Callbacks Implementation
+void BLEServerCallback::onConnect(BLEServer* pServer) {
+    if (bleControl) {
+        uint16_t clientId = pServer->getConnId();
+        bleControl->handleClientConnect(clientId);
+    }
+}
+
+void BLEServerCallback::onDisconnect(BLEServer* pServer) {
+    if (bleControl) {
+        bleControl->handleClientDisconnect();
+    }
+}
+
+// BLE Characteristic Callbacks Implementation
 void BLECharacteristicCallback::onWrite(BLECharacteristic* characteristic) {
     if (!bleControl) return;
     
@@ -32,7 +46,6 @@ void BLECharacteristicCallback::onWrite(BLECharacteristic* characteristic) {
 }
 
 void BLECharacteristicCallback::onRead(BLECharacteristic* characteristic) {
-    // Ensure the BLEControl reference is valid
     std::string uuid = characteristic->getUUID().toString();
     std::string value = characteristic->getValue();
     
@@ -63,19 +76,52 @@ void BLECharacteristicCallback::onRead(BLECharacteristic* characteristic) {
     }
 }
 
-// BLEControl constructor that takes references to podOpenFlag, wifiControl, and childLock
-BLEControl::BLEControl(bool* podOpenFlag, WiFiControl* wifiControl, bool* childLock) : pServer(nullptr), pDoorStatus(nullptr), pDoorPosition(nullptr), pLEDStatus(nullptr), pLEDBrightness(nullptr), pLEDColor(nullptr),pWiFiCredentials(nullptr), pWiFiStatus(nullptr), pChildLock(nullptr), podOpenFlagRef(podOpenFlag), wifiControlRef(wifiControl), childLockRef(childLock), networkBuffer(""), passwordBuffer("") {
+// BLEControl Constructor
+BLEControl::BLEControl(bool* podOpenFlag, WiFiControl* wifiControl, bool* childLock) 
+    : pServer(nullptr), pAdvertising(nullptr), pDoorStatus(nullptr), pDoorPosition(nullptr), 
+      pLEDStatus(nullptr), pLEDBrightness(nullptr), pLEDColor(nullptr), pWiFiCredentials(nullptr), 
+      pWiFiStatus(nullptr), pChildLock(nullptr), isClientConnected(false), connectedClientId(0),
+      podOpenFlagRef(podOpenFlag), wifiControlRef(wifiControl), childLockRef(childLock), 
+      networkBuffer(""), passwordBuffer("") {
 }
 
 void BLEControl::begin() {
+    Serial.println("Initializing BLE...");
+    
     // Initialize BLE
     BLEDevice::init("Sole Pod");
     pServer = BLEDevice::createServer();
+    
+    // Set server callbacks for connection management
+    pServer->setCallbacks(new BLEServerCallback(this));
 
-    // Allow for more than 8 characteritics
+    // Create service with more characteristics support
     static BLEUUID serviceUUID("7d840001-11eb-4c13-89f2-246b6e0b0000");
     BLEService* pService = pServer->createService(serviceUUID, 30, 0); 
 
+    // Create all characteristics
+    createCharacteristics(pService);
+    
+    // Set initial values based on current states
+    setInitialValues();
+
+    // Start the service
+    pService->start();
+
+    // Get advertising instance and configure it
+    pAdvertising = BLEDevice::getAdvertising();
+    pAdvertising->addServiceUUID(UUID_SERVICE);
+    pAdvertising->setScanResponse(true);
+    pAdvertising->setMinPreferred(0x06);  // Functions that help with iPhone connections issue
+    pAdvertising->setMinPreferred(0x12);
+    
+    // Start advertising
+    startAdvertising();
+
+    Serial.println("BLE Control initialized and advertising started");
+}
+
+void BLEControl::createCharacteristics(BLEService* pService) {
     // Create Door Status Characteristic
     pDoorStatus = pService->createCharacteristic(
         UUID_DOOR_STATUS, 
@@ -130,7 +176,9 @@ void BLEControl::begin() {
         BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_READ
     );
     pChildLock->setCallbacks(new BLECharacteristicCallback(this, UUID_CHILD_LOCK));
-    
+}
+
+void BLEControl::setInitialValues() {
     // Set initial values based on current states
     updateDoorStatus(*podOpenFlagRef);
     updateDoorPosition(getDoorPosition());
@@ -148,33 +196,63 @@ void BLEControl::begin() {
 
     // Set initial child lock status
     updateChildLock(*childLockRef);
-
-    // Start the service
-    pService->start();
-
-    // Start advertising
-    BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
-    pAdvertising->addServiceUUID(UUID_SERVICE);
-    pAdvertising->start();
-
-    Serial.println("BLE Control initialized and advertising");
 }
 
+void BLEControl::startAdvertising() {
+    if (pAdvertising) {
+        pAdvertising->start();
+        Serial.println("BLE advertising started");
+    }
+}
+
+void BLEControl::stopAdvertising() {
+    if (pAdvertising) {
+        pAdvertising->stop();
+        Serial.println("BLE advertising stopped");
+    }
+}
+
+void BLEControl::handleClientConnect(uint16_t clientId) {
+    if (isClientConnected) {
+        // Already have a client connected - disconnect the new one
+        Serial.printf("BLE: New client attempted to connect, but client %d is already connected. Disconnecting new client.\n", connectedClientId);
+        pServer->disconnect(clientId);
+        return;
+    }
+    
+    // Accept the new connection
+    isClientConnected = true;
+    connectedClientId = clientId;
+    Serial.printf("BLE Client connected (ID: %d)\n", clientId);
+    
+    // Optional: Stop advertising to save resources (since we only want one connection)
+    // Uncomment the next line if you want to stop advertising when connected
+    // stopAdvertising();
+}
+
+void BLEControl::handleClientDisconnect() {
+    Serial.printf("BLE Client disconnected (ID: %d)\n", connectedClientId);
+    
+    // Reset connection state
+    isClientConnected = false;
+    connectedClientId = 0;
+    
+    // Restart advertising to allow new connections
+    Serial.println("Restarting BLE advertising...");
+    startAdvertising();
+}
+
+// All the existing characteristic handler methods remain the same
 void BLEControl::handleDoorStatusWrite(BLECharacteristic* characteristic) {
     if (characteristic == pDoorStatus) {
         std::string value = characteristic->getValue();
-        
-        // Convert received value to string for easier processing
         String doorStatus = String(value.c_str());
         
-        // Only accept valid values (0 or 1)
         if (doorStatus == "1") {
-            // Open the pod
             Serial.println("BLE Command: Open Pod");
             *podOpenFlagRef = true;
         } 
         else if (doorStatus == "0") {
-            // Close the pod
             Serial.println("BLE Command: Close Pod");
             *podOpenFlagRef = false;
         }
@@ -187,18 +265,13 @@ void BLEControl::handleDoorStatusWrite(BLECharacteristic* characteristic) {
 void BLEControl::handleLEDStatusWrite(BLECharacteristic* characteristic) {
     if (characteristic == pLEDStatus) {
         std::string value = characteristic->getValue();
-        
-        // Convert received value to string for easier processing
         String ledStatus = String(value.c_str());
         
-        // Only accept valid values (0 or 1)
         if (ledStatus == "1") {
-            // Turn on the LED
             Serial.println("BLE Command: Turn LED ON");
             setLEDState(LED_STATE_ON);
         } 
         else if (ledStatus == "0") {
-            // Turn off the LED
             Serial.println("BLE Command: Turn LED OFF");
             setLEDState(LED_STATE_OFF);
         }
@@ -212,18 +285,15 @@ void BLEControl::handleLEDBrightnessWrite(BLECharacteristic* characteristic) {
     if (characteristic == pLEDBrightness) {
         std::string value = characteristic->getValue();
         
-        // Convert received value to integer
         int brightness = 0;
         try {
             brightness = std::stoi(value);
             
-            // Validate brightness range (0-100)
             if (brightness >= 0 && brightness <= 100) {
                 Serial.print("BLE Command: Set LED Brightness to ");
                 Serial.print(brightness);
                 Serial.println("%");
                 
-                // Pass directly to LED control (already in 0-100 range)
                 setLEDBrightness(brightness);
             } else {
                 Serial.print("Invalid brightness value received: ");
@@ -236,60 +306,19 @@ void BLEControl::handleLEDBrightnessWrite(BLECharacteristic* characteristic) {
     }
 }
 
-void BLEControl::updateDoorStatus(bool isOpen) {
-    // Update the BLE characteristic with the current door state
-    if (pDoorStatus) {
-        String status = isOpen ? "1" : "0";
-        pDoorStatus->setValue(status.c_str());
-        Serial.print("BLE Door Status updated: ");
-        Serial.println(status);
-    }
-}
-
-void BLEControl::updateLEDStatus(uint8_t ledState) {
-    // Update the BLE characteristic with the current LED state
-    if (pLEDStatus) {
-        String status = (ledState == LED_STATE_ON) ? "1" : "0";
-        pLEDStatus->setValue(status.c_str());
-        Serial.print("BLE LED Status updated: ");
-        Serial.println(status);
-    }
-}
-
-void BLEControl::updateLEDBrightness(uint8_t brightness) {
-    // Ensure value is within allowed range (0-100)
-    if (brightness > MAX_BRIGHTNESS) {
-        brightness = MAX_BRIGHTNESS;
-    }
-    
-    // Update the BLE characteristic with the current LED brightness
-    if (pLEDBrightness) {
-        String value = String(brightness);
-        pLEDBrightness->setValue(value.c_str());
-        Serial.print("BLE LED Brightness updated: ");
-        Serial.print(brightness);
-        Serial.println(" (0-100 scale)");
-    }
-}
-
 void BLEControl::handleDoorPositionWrite(BLECharacteristic* characteristic) {
     if (characteristic == pDoorPosition) {
         std::string value = characteristic->getValue();
         
-        // Convert received value to integer
         int position = 0;
         try {
             position = std::stoi(value);
             
-            // Validate position (only 50 or 100 allowed)
             if (position == 50 || position == 100) {
                 Serial.print("BLE Command: Set Door Position to ");
                 Serial.println(position);
                 
-                // Update the door position
                 setDoorPosition(position);
-                
-                // Update the BLE characteristic
                 updateDoorPosition(position);
             } else {
                 Serial.print("Invalid door position value received: ");
@@ -302,43 +331,15 @@ void BLEControl::handleDoorPositionWrite(BLECharacteristic* characteristic) {
     }
 }
 
-// Add function to update the BLE characteristic:
-void BLEControl::updateDoorPosition(uint8_t position) {
-    // Ensure position is valid (50 or 100)
-    if (position != 50 && position != 100) {
-        position = 100; // Default to 100 if invalid
-    }
-    
-    // Update the BLE characteristic
-    if (pDoorPosition) {
-        String value = String(position);
-        pDoorPosition->setValue(value.c_str());
-        Serial.print("BLE Door Position updated: ");
-        Serial.println(position);
-    }
-}
-
 void BLEControl::handleLEDColorWrite(BLECharacteristic* characteristic) {
     if (characteristic == pLEDColor) {
         std::string value = characteristic->getValue();
-        
-        // Convert received value to string for easier processing
         String ledColor = String(value.c_str());
         
         Serial.print("BLE Command: Set LED Color to ");
         Serial.println(ledColor);
         
-        // Set the LED color using the provided value
         setLEDColor(ledColor);
-    }
-}
-
-void BLEControl::updateLEDColor(String color) {
-    // Update the BLE characteristic with the current LED color
-    if (pLEDColor) {
-        pLEDColor->setValue(color.c_str());
-        Serial.print("BLE LED Color updated: ");
-        Serial.println(color);
     }
 }
 
@@ -352,18 +353,13 @@ void BLEControl::handleWiFiCredentialsWrite(BLECharacteristic* characteristic) {
 void BLEControl::handleChildLockWrite(BLECharacteristic* characteristic) {
     if (characteristic == pChildLock) {
         std::string value = characteristic->getValue();
-        
-        // Convert received value to string for easier processing
         String childLockStatus = String(value.c_str());
         
-        // Only accept valid values (0 or 1)
         if (childLockStatus == "1") {
-            // Enable child lock
             Serial.println("BLE Command: Enable Child Lock");
             *childLockRef = true;
         } 
         else if (childLockStatus == "0") {
-            // Disable child lock
             Serial.println("BLE Command: Disable Child Lock");
             *childLockRef = false;
         }
@@ -378,16 +374,15 @@ void BLEControl::onNetworkReceived(const std::string& value) {
     int networkIndex = data.indexOf("ENDNETWORK");
     int passwordIndex = data.indexOf("ENDPASSWORD");
     if (networkIndex != -1 && passwordIndex != -1) {
-        // Extract the network SSID and password
-        String ssid = data.substring(0, networkIndex); // Everything before "ENDNETWORK"
-        String password = data.substring(networkIndex + 10, passwordIndex); // Between "ENDNETWORK" and "ENDPASSWORD"
+        String ssid = data.substring(0, networkIndex);
+        String password = data.substring(networkIndex + 10, passwordIndex);
         
-        networkBuffer = ssid;  // Store the SSID
-        passwordBuffer = password;  // Store the password
+        networkBuffer = ssid;
+        passwordBuffer = password;
         Serial.printf("Received Network SSID: %s\n", ssid.c_str());
         Serial.printf("Received Password: %s\n", password.c_str());
         
-        finalizeNetwork();  // After receiving both, attempt to connect to Wi-Fi
+        finalizeNetwork();
     } else {
         Serial.println("Invalid format, missing ENDNETWORK or ENDPASSWORD.");
     }
@@ -395,12 +390,10 @@ void BLEControl::onNetworkReceived(const std::string& value) {
 
 void BLEControl::finalizeNetwork() {
     if (networkBuffer.length() > 0 && passwordBuffer.length() > 0) {
-        // Attempt to connect to WiFi with new credentials
         Serial.println("Attempting to connect to WiFi with new credentials...");
         
         bool connected = wifiControlRef->updateWiFiCredentials(networkBuffer, passwordBuffer);
         
-        // Clear buffers after connection attempt
         String status;
         if (connected) {
             status = "CONNECTED:" + networkBuffer + ":" + wifiControlRef->getLocalIP().toString();
@@ -410,12 +403,64 @@ void BLEControl::finalizeNetwork() {
             Serial.println("WiFi connection failed!");
         }
         
-        // Update the WiFi status characteristic
         updateWiFiStatus(status);
         
-        // Clear buffers
         networkBuffer = "";
         passwordBuffer = "";
+    }
+}
+
+// All the update methods remain the same
+void BLEControl::updateDoorStatus(bool isOpen) {
+    if (pDoorStatus) {
+        String status = isOpen ? "1" : "0";
+        pDoorStatus->setValue(status.c_str());
+        Serial.print("BLE Door Status updated: ");
+        Serial.println(status);
+    }
+}
+
+void BLEControl::updateLEDStatus(uint8_t ledState) {
+    if (pLEDStatus) {
+        String status = (ledState == LED_STATE_ON) ? "1" : "0";
+        pLEDStatus->setValue(status.c_str());
+        Serial.print("BLE LED Status updated: ");
+        Serial.println(status);
+    }
+}
+
+void BLEControl::updateLEDBrightness(uint8_t brightness) {
+    if (brightness > MAX_BRIGHTNESS) {
+        brightness = MAX_BRIGHTNESS;
+    }
+    
+    if (pLEDBrightness) {
+        String value = String(brightness);
+        pLEDBrightness->setValue(value.c_str());
+        Serial.print("BLE LED Brightness updated: ");
+        Serial.print(brightness);
+        Serial.println(" (0-100 scale)");
+    }
+}
+
+void BLEControl::updateDoorPosition(uint8_t position) {
+    if (position != 50 && position != 100) {
+        position = 100;
+    }
+    
+    if (pDoorPosition) {
+        String value = String(position);
+        pDoorPosition->setValue(value.c_str());
+        Serial.print("BLE Door Position updated: ");
+        Serial.println(position);
+    }
+}
+
+void BLEControl::updateLEDColor(String color) {
+    if (pLEDColor) {
+        pLEDColor->setValue(color.c_str());
+        Serial.print("BLE LED Color updated: ");
+        Serial.println(color);
     }
 }
 
@@ -428,7 +473,6 @@ void BLEControl::updateWiFiStatus(const String& status) {
 }
 
 void BLEControl::updateChildLock(bool childLockOn) {
-    // Update the BLE characteristic with the current child lock state
     if (pChildLock) {
         String status = childLockOn ? "1" : "0";
         pChildLock->setValue(status.c_str());
