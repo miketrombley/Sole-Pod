@@ -48,6 +48,7 @@ void saveLEDState(uint8_t ledState) {
     Serial.print("LED State saved: ");
     Serial.println(ledState == 1 ? "ON" : "OFF");
 }
+
 void saveDoorStatus(bool doorOpen) {
     preferences.begin(SETTINGS_NAMESPACE, false);
     preferences.putBool("doorStatus", doorOpen);
@@ -57,6 +58,14 @@ void saveDoorStatus(bool doorOpen) {
     Serial.println(doorOpen ? "OPEN" : "CLOSED");
 }
 
+void saveChildLockState(bool childLock) {
+    preferences.begin(SETTINGS_NAMESPACE, false);
+    preferences.putBool("childLock", childLock);
+    preferences.end();
+    
+    Serial.print("Child Lock State saved: ");
+    Serial.println(childLock ? "ENABLED" : "DISABLED");
+}
 
 // Renamed getter functions to avoid naming conflicts
 
@@ -95,9 +104,16 @@ bool getSavedDoorStatus(bool defaultStatus) {
     return status;
 }
 
+bool getSavedChildLockState(bool defaultState) {
+    preferences.begin(SETTINGS_NAMESPACE, true);
+    bool state = preferences.getBool("childLock", defaultState);
+    preferences.end();
+    return state;
+}
+
 // Function to load all settings at once during startup
 bool loadAllSettings(String &ledColor, uint8_t &ledBrightness, 
-                    uint8_t &doorPosition, uint8_t &ledState, bool &doorStatus) {
+                    uint8_t &doorPosition, uint8_t &ledState, bool &doorStatus, bool &childLock) {
     bool settingsExist = false;
     
     preferences.begin(SETTINGS_NAMESPACE, true);
@@ -111,6 +127,7 @@ bool loadAllSettings(String &ledColor, uint8_t &ledBrightness,
     doorPosition = preferences.getUChar("doorPos", 100);
     ledState = preferences.getUChar("ledState", 0); // Default to OFF (0)
     doorStatus = preferences.getBool("doorStatus", false); // Default to CLOSED
+    childLock = preferences.getBool("childLock", false); // Default to DISABLED
     
     preferences.end();
     
@@ -126,6 +143,8 @@ bool loadAllSettings(String &ledColor, uint8_t &ledBrightness,
         Serial.println(ledState == 1 ? "ON" : "OFF");
         Serial.print("Door Status: ");
         Serial.println(doorStatus ? "OPEN" : "CLOSED");
+        Serial.print("Child Lock: ");
+        Serial.println(childLock ? "ENABLED" : "DISABLED");
     } else {
         Serial.println("No saved settings found, using defaults");
     }

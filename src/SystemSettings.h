@@ -14,8 +14,9 @@ void initSettings();
 void saveLEDColor(String ledColor);
 void saveLEDBrightness(uint8_t ledBrightness);
 void saveDoorPosition(uint8_t doorPosition);
-void saveLEDState(uint8_t ledState); // New function
+void saveLEDState(uint8_t ledState);
 void saveDoorStatus(bool doorOpen);
+void saveChildLockState(bool childLock);
 
 // Renamed getter functions to avoid naming conflicts
 String getSavedLEDColor(String defaultColor = "FFFFFF");
@@ -23,9 +24,10 @@ uint8_t getSavedLEDBrightness(uint8_t defaultBrightness = 100);
 uint8_t getSavedDoorPosition(uint8_t defaultPosition = 100);
 uint8_t getSavedLEDState(uint8_t defaultState = 0); // Use raw value 0 instead of LED_STATE_OFF
 bool getSavedDoorStatus(bool defaultStatus = false);
+bool getSavedChildLockState(bool defaultState = false);
 
 // Function to load all settings at once during startup
 bool loadAllSettings(String &ledColor, uint8_t &ledBrightness, 
-                    uint8_t &doorPosition, uint8_t &ledState, bool &doorStatus);
+                    uint8_t &doorPosition, uint8_t &ledState, bool &doorStatus, bool &childLock);
 
 #endif // SYSTEM_SETTINGS_H

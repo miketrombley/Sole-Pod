@@ -26,6 +26,9 @@ void BLECharacteristicCallback::onWrite(BLECharacteristic* characteristic) {
     else if (uuid == UUID_WIFI_CREDENTIALS) {
         bleControl->handleWiFiCredentialsWrite(characteristic);
     }
+    else if (uuid == UUID_CHILD_LOCK) {
+        bleControl->handleChildLockWrite(characteristic);
+    }
 }
 
 void BLECharacteristicCallback::onRead(BLECharacteristic* characteristic) {
@@ -54,10 +57,14 @@ void BLECharacteristicCallback::onRead(BLECharacteristic* characteristic) {
         Serial.print("BLE Client read LED color: ");
         Serial.println(value.c_str());
     }
+    else if (uuid == UUID_CHILD_LOCK) {
+        Serial.print("BLE Client read child lock status: ");
+        Serial.println(value.c_str());
+    }
 }
 
-// BLEControl constructor that takes a reference to the podOpenFlag
-BLEControl::BLEControl(bool* podOpenFlag, WiFiControl* wifiControl) : pServer(nullptr), pDoorStatus(nullptr), pDoorPosition(nullptr), pLEDStatus(nullptr), pLEDBrightness(nullptr), pLEDColor(nullptr),pWiFiCredentials(nullptr), pWiFiStatus(nullptr), podOpenFlagRef(podOpenFlag), wifiControlRef(wifiControl),networkBuffer(""), passwordBuffer("") {
+// BLEControl constructor that takes references to podOpenFlag, wifiControl, and childLock
+BLEControl::BLEControl(bool* podOpenFlag, WiFiControl* wifiControl, bool* childLock) : pServer(nullptr), pDoorStatus(nullptr), pDoorPosition(nullptr), pLEDStatus(nullptr), pLEDBrightness(nullptr), pLEDColor(nullptr),pWiFiCredentials(nullptr), pWiFiStatus(nullptr), pChildLock(nullptr), podOpenFlagRef(podOpenFlag), wifiControlRef(wifiControl), childLockRef(childLock), networkBuffer(""), passwordBuffer("") {
 }
 
 void BLEControl::begin() {
@@ -65,8 +72,9 @@ void BLEControl::begin() {
     BLEDevice::init("Sole Pod");
     pServer = BLEDevice::createServer();
 
-    // Create BLE Service
-    BLEService* pService = pServer->createService(UUID_SERVICE);
+    // Allow for more than 8 characteritics
+    static BLEUUID serviceUUID("7d840001-11eb-4c13-89f2-246b6e0b0000");
+    BLEService* pService = pServer->createService(serviceUUID, 30, 0); 
 
     // Create Door Status Characteristic
     pDoorStatus = pService->createCharacteristic(
@@ -116,6 +124,13 @@ void BLEControl::begin() {
         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
     );
     
+    // Create Child Lock Characteristic
+    pChildLock = pService->createCharacteristic(
+        UUID_CHILD_LOCK,
+        BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_READ
+    );
+    pChildLock->setCallbacks(new BLECharacteristicCallback(this, UUID_CHILD_LOCK));
+    
     // Set initial values based on current states
     updateDoorStatus(*podOpenFlagRef);
     updateDoorPosition(getDoorPosition());
@@ -130,6 +145,9 @@ void BLEControl::begin() {
     
     // Set initial WiFi status
     updateWiFiStatus(wifiControlRef->getWiFiStatusString());
+
+    // Set initial child lock status
+    updateChildLock(*childLockRef);
 
     // Start the service
     pService->start();
@@ -331,6 +349,30 @@ void BLEControl::handleWiFiCredentialsWrite(BLECharacteristic* characteristic) {
     }
 }
 
+void BLEControl::handleChildLockWrite(BLECharacteristic* characteristic) {
+    if (characteristic == pChildLock) {
+        std::string value = characteristic->getValue();
+        
+        // Convert received value to string for easier processing
+        String childLockStatus = String(value.c_str());
+        
+        // Only accept valid values (0 or 1)
+        if (childLockStatus == "1") {
+            // Enable child lock
+            Serial.println("BLE Command: Enable Child Lock");
+            *childLockRef = true;
+        } 
+        else if (childLockStatus == "0") {
+            // Disable child lock
+            Serial.println("BLE Command: Disable Child Lock");
+            *childLockRef = false;
+        }
+        else {
+            Serial.println("Invalid Child Lock value received! Only 0 or 1 allowed.");
+        }
+    }
+}
+
 void BLEControl::onNetworkReceived(const std::string& value) {
     String data = String(value.c_str());
     int networkIndex = data.indexOf("ENDNETWORK");
@@ -382,5 +424,15 @@ void BLEControl::updateWiFiStatus(const String& status) {
         pWiFiStatus->setValue(status.c_str());
         Serial.print("BLE WiFi Status updated: ");
         Serial.println(status);
+    }
+}
+
+void BLEControl::updateChildLock(bool childLockOn) {
+    // Update the BLE characteristic with the current child lock state
+    if (pChildLock) {
+        String status = childLockOn ? "1" : "0";
+        pChildLock->setValue(status.c_str());
+        Serial.print("BLE Child Lock updated: ");
+        Serial.println(childLockOn ? "ENABLED" : "DISABLED");
     }
 }

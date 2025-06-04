@@ -18,6 +18,7 @@
 #define UUID_LIGHTS_COLOR      "7d840006-11eb-4c13-89f2-246b6e0b0005"
 #define UUID_WIFI_CREDENTIALS  "7d840007-11eb-4c13-89f2-246b6e0b0006"
 #define UUID_WIFI_STATUS       "7d840008-11eb-4c13-89f2-246b6e0b0007"
+#define UUID_CHILD_LOCK        "7d840006-11eb-4c13-89f2-246b6e0b0008"
 
 // Valid ranges for BLE characteristics
 #define MIN_BRIGHTNESS 0
@@ -50,6 +51,7 @@ private:
     BLECharacteristic* pLEDColor;
     BLECharacteristic* pWiFiCredentials;
     BLECharacteristic* pWiFiStatus;
+    BLECharacteristic* pChildLock;
     
     // Reference to external state flag to control door state
     bool* podOpenFlagRef;
@@ -57,13 +59,16 @@ private:
     // Reference to WiFi controller
     WiFiControl* wifiControlRef;
     
+    // Reference to child lock state
+    bool* childLockRef;
+    
     // Network credentials buffers
     String networkBuffer;
     String passwordBuffer;
 
 public:
-    // Updated constructor to include WiFiControl reference
-    BLEControl(bool* podOpenFlag, WiFiControl* wifiControl);
+    // Updated constructor to include WiFiControl reference and child lock reference
+    BLEControl(bool* podOpenFlag, WiFiControl* wifiControl, bool* childLock);
     void begin();
     
     // Handler for door status characteristic changes
@@ -83,6 +88,9 @@ public:
     
     // Handler for WiFi credentials characteristic changes
     void handleWiFiCredentialsWrite(BLECharacteristic* characteristic);
+    
+    // Handler for child lock characteristic changes
+    void handleChildLockWrite(BLECharacteristic* characteristic);
     
     // Helper method to process received network info
     void onNetworkReceived(const std::string& value);
@@ -107,6 +115,9 @@ public:
     
     // Updates the BLE characteristic with current WiFi status
     void updateWiFiStatus(const String& status);
+    
+    // Updates the BLE characteristic based on the current child lock state
+    void updateChildLock(bool childLockOn);
 };
 
 #endif // BLECONTROL_H
