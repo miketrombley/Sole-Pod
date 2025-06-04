@@ -294,7 +294,15 @@ void BLEControl::handleLEDBrightnessWrite(BLECharacteristic* characteristic) {
                 Serial.print(brightness);
                 Serial.println("%");
                 
-                setLEDBrightness(brightness);
+                if (brightness == 0) {
+                    // Brightness 0 means turn LED off
+                    setLEDState(LED_STATE_OFF);
+                    setLEDBrightness(0);  // Store the brightness value
+                } else {
+                    // Brightness > 0 means turn LED on with that brightness
+                    setLEDState(LED_STATE_ON);
+                    setLEDBrightness(brightness);
+                }
             } else {
                 Serial.print("Invalid brightness value received: ");
                 Serial.print(brightness);

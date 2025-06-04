@@ -90,9 +90,9 @@ void setLEDBrightness(uint8_t brightness) {
     ledBrightness = brightness;
     
     // Update the physical LED if it's on
-    if (lightState == LED_STATE_ON) {
-        // Scale brightness from 0-100 to 0-255 for NeoPixel
-        uint8_t scaledBrightness = map(ledBrightness, 0, 100, 0, 255);
+    if (lightState == LED_STATE_ON && brightness > 0) {
+        // Scale brightness from 1-100 to 10-255 for NeoPixel (better linear perception)
+        uint8_t scaledBrightness = map(ledBrightness, 1, 100, 10, 255);
         strip.setBrightness(scaledBrightness);
         strip.show();
     }
