@@ -1,7 +1,7 @@
 #ifndef LED_CONTROL_H
 #define LED_CONTROL_H
 
-#include <Adafruit_NeoPixel.h>
+#include <FastLED.h>
 #include "SystemSettings.h"
 
 // Define LED data pins and configuration
@@ -33,5 +33,6 @@ void updateLEDColor();
 // External variable declarations
 extern uint8_t ledBrightness;
 extern String ledColorHex;
+extern CRGB leds[NUM_LEDS];  // FastLED array
 
 #endif // LED_CONTROL_H
