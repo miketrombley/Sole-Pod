@@ -7,6 +7,7 @@
 #include <BLECharacteristic.h>
 #include <BLEService.h>
 #include <BLEAdvertising.h>
+#include <ArduinoJson.h>  // Add this for JSON support
 #include "WiFiControl.h"
 
 // Define Service and Characteristic UUIDs
@@ -19,10 +20,14 @@
 #define UUID_WIFI_CREDENTIALS  "7d840007-11eb-4c13-89f2-246b6e0b0006"
 #define UUID_WIFI_STATUS       "7d840008-11eb-4c13-89f2-246b6e0b0007"
 #define UUID_CHILD_LOCK        "7d840006-11eb-4c13-89f2-246b6e0b0008"
+#define UUID_JSON_STATUS       "7d840009-11eb-4c13-89f2-246b6e0b0009"  // New JSON status characteristic
 
 // Valid ranges for BLE characteristics
 #define MIN_BRIGHTNESS 0
 #define MAX_BRIGHTNESS 100
+
+// JSON update interval (milliseconds)
+#define JSON_UPDATE_INTERVAL 1000  // Update every 1 second
 
 // Forward declarations
 class BLEControl;
@@ -65,6 +70,7 @@ private:
     BLECharacteristic* pWiFiCredentials;
     BLECharacteristic* pWiFiStatus;
     BLECharacteristic* pChildLock;
+    BLECharacteristic* pJSONStatus;  // New JSON status characteristic
     
     // Connection state tracking
     bool isClientConnected;
@@ -82,6 +88,9 @@ private:
     // Network credentials buffers
     String networkBuffer;
     String passwordBuffer;
+    
+    // JSON update timing
+    unsigned long lastJSONUpdate;
 
 public:
     // Constructor
@@ -89,6 +98,10 @@ public:
     
     // Main initialization
     void begin();
+    
+    // JSON status management
+    void updateJSONStatus();
+    void checkJSONUpdate();  // Call this from main loop
     
     // Connection management
     void startAdvertising();

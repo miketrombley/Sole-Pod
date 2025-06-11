@@ -88,6 +88,9 @@ void loop() {
     // Handle child lock state monitoring
     runChildLockControl();
     
+    // Check and update JSON status characteristic (NEW)
+    bleControl.checkJSONUpdate();
+    
     // Print debug information if enabled
     if (DEBUG_MODE) {
         printDebugInfo();

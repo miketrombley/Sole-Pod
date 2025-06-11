@@ -74,15 +74,19 @@ void BLECharacteristicCallback::onRead(BLECharacteristic* characteristic) {
         Serial.print("BLE Client read child lock status: ");
         Serial.println(value.c_str());
     }
+    else if (uuid == UUID_JSON_STATUS) {
+        Serial.print("BLE Client read JSON status: ");
+        Serial.println(value.c_str());
+    }
 }
 
 // BLEControl Constructor
 BLEControl::BLEControl(bool* podOpenFlag, WiFiControl* wifiControl, bool* childLock) 
     : pServer(nullptr), pAdvertising(nullptr), pDoorStatus(nullptr), pDoorPosition(nullptr), 
       pLEDStatus(nullptr), pLEDBrightness(nullptr), pLEDColor(nullptr), pWiFiCredentials(nullptr), 
-      pWiFiStatus(nullptr), pChildLock(nullptr), isClientConnected(false), connectedClientId(0),
+      pWiFiStatus(nullptr), pChildLock(nullptr), pJSONStatus(nullptr), isClientConnected(false), connectedClientId(0),
       podOpenFlagRef(podOpenFlag), wifiControlRef(wifiControl), childLockRef(childLock), 
-      networkBuffer(""), passwordBuffer("") {
+      networkBuffer(""), passwordBuffer(""), lastJSONUpdate(0) {
 }
 
 void BLEControl::begin() {
@@ -97,7 +101,7 @@ void BLEControl::begin() {
 
     // Create service with more characteristics support
     static BLEUUID serviceUUID("7d840001-11eb-4c13-89f2-246b6e0b0000");
-    BLEService* pService = pServer->createService(serviceUUID, 30, 0); 
+    BLEService* pService = pServer->createService(serviceUUID, 35, 0); // Increased for JSON characteristic
 
     // Create all characteristics
     createCharacteristics(pService);
@@ -176,6 +180,13 @@ void BLEControl::createCharacteristics(BLEService* pService) {
         BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_READ
     );
     pChildLock->setCallbacks(new BLECharacteristicCallback(this, UUID_CHILD_LOCK));
+    
+    // Create JSON Status Characteristic (read-only with notify)
+    pJSONStatus = pService->createCharacteristic(
+        UUID_JSON_STATUS,
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
+    );
+    pJSONStatus->setCallbacks(new BLECharacteristicCallback(this, UUID_JSON_STATUS));
 }
 
 void BLEControl::setInitialValues() {
@@ -196,6 +207,61 @@ void BLEControl::setInitialValues() {
 
     // Set initial child lock status
     updateChildLock(*childLockRef);
+    
+    // Set initial JSON status
+    updateJSONStatus();
+}
+
+// JSON Status Management
+void BLEControl::updateJSONStatus() {
+    if (!pJSONStatus) return;
+    
+    // Create JSON document
+    StaticJsonDocument<512> jsonDoc;
+    
+    // Get current values from individual characteristics
+    String doorStatusValue = String(pDoorStatus->getValue().c_str());
+    String doorPositionValue = String(pDoorPosition->getValue().c_str());
+    String ledStatusValue = String(pLEDStatus->getValue().c_str());
+    String ledBrightnessValue = String(pLEDBrightness->getValue().c_str());
+    String ledColorValue = String(pLEDColor->getValue().c_str());
+    String wifiStatusValue = String(pWiFiStatus->getValue().c_str());
+    String childLockValue = String(pChildLock->getValue().c_str());
+    
+    // Populate JSON document
+    jsonDoc["door_status"] = doorStatusValue.toInt();
+    jsonDoc["door_position"] = doorPositionValue.toInt();
+    jsonDoc["led_status"] = ledStatusValue.toInt();
+    jsonDoc["led_brightness"] = ledBrightnessValue.toInt();
+    jsonDoc["led_color"] = ledColorValue;
+    jsonDoc["wifi_status"] = wifiStatusValue;
+    jsonDoc["child_lock"] = childLockValue.toInt();
+    jsonDoc["timestamp"] = millis();  // Add timestamp for freshness
+    
+    // Serialize JSON to string
+    char jsonBuffer[512];
+    size_t jsonLength = serializeJson(jsonDoc, jsonBuffer);
+    
+    // Update the characteristic
+    pJSONStatus->setValue(jsonBuffer);
+    
+    // Notify connected clients if any
+    if (isClientConnected) {
+        pJSONStatus->notify();
+    }
+    
+    Serial.print("JSON Status updated: ");
+    Serial.println(jsonBuffer);
+}
+
+void BLEControl::checkJSONUpdate() {
+    unsigned long currentTime = millis();
+    
+    // Update JSON status at regular intervals
+    if (currentTime - lastJSONUpdate >= JSON_UPDATE_INTERVAL) {
+        updateJSONStatus();
+        lastJSONUpdate = currentTime;
+    }
 }
 
 void BLEControl::startAdvertising() {
@@ -224,6 +290,9 @@ void BLEControl::handleClientConnect(uint16_t clientId) {
     isClientConnected = true;
     connectedClientId = clientId;
     Serial.printf("BLE Client connected (ID: %d)\n", clientId);
+    
+    // Send initial JSON status to new client
+    updateJSONStatus();
     
     // Optional: Stop advertising to save resources (since we only want one connection)
     // Uncomment the next line if you want to stop advertising when connected
