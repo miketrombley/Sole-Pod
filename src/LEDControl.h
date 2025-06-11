@@ -16,7 +16,7 @@
 // LED brightness constants
 #define MAX_BRIGHTNESS 100
 
-// Function prototypes
+// Main function prototypes
 void initLEDs();
 void handleLEDButton(bool childLockOn);
 void setLEDState(uint8_t state);
@@ -26,6 +26,11 @@ uint8_t getLEDBrightness();
 void setLEDColor(String colorHex);
 String getLEDColor();
 
+// Helper function prototypes
+void hexToRGB(const String& hexColor, uint8_t& r, uint8_t& g, uint8_t& b);
+void updateLEDColor();
+
+// External variable declarations
 extern uint8_t ledBrightness;
 extern String ledColorHex;
 
