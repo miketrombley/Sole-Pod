@@ -1,0 +1,4 @@
+﻿Designator,Footprint,Quantity,Value,LCSC Part #
+C1,C603,1,100n 50V,C14663
+"J1, J2, J3",SolderWirePad_1x01_SMD_1x2mm,3,Conn_01x01_Pin,DNP
+U1,SOT-23,1,SK1816,C75517
