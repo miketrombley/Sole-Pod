@@ -2,6 +2,7 @@
 #include "MotorControl.h"
 #include "LEDControl.h"
 
+
 // BLE Server Callbacks Implementation
 void BLEServerCallback::onConnect(BLEServer* pServer) {
     if (bleControl) {
@@ -10,11 +11,11 @@ void BLEServerCallback::onConnect(BLEServer* pServer) {
     }
 }
 
-void BLEServerCallback::onDisconnect(BLEServer* pServer) {
-    if (bleControl) {
-        bleControl->handleClientDisconnect();
-    }
-}
+// void BLEServerCallback::onDisconnect(BLEServer* pServer) {
+//     if (bleControl) {
+//         bleControl->handleClientDisconnect();
+//     }
+// }
 
 // BLE Characteristic Callbacks Implementation
 void BLECharacteristicCallback::onWrite(BLECharacteristic* characteristic) {
@@ -209,60 +210,60 @@ void BLEControl::setInitialValues() {
     updateChildLock(*childLockRef);
     
     // Set initial JSON status
-    updateJSONStatus();
+    //updateJSONStatus();
 }
 
 // JSON Status Management
-void BLEControl::updateJSONStatus() {
-    if (!pJSONStatus) return;
+// void BLEControl::updateJSONStatus() {
+//     if (!pJSONStatus) return;
     
-    // Create JSON document
-    StaticJsonDocument<512> jsonDoc;
+//     // Create JSON document
+//     StaticJsonDocument<512> jsonDoc;
     
-    // Get current values from individual characteristics
-    String doorStatusValue = String(pDoorStatus->getValue().c_str());
-    String doorPositionValue = String(pDoorPosition->getValue().c_str());
-    String ledStatusValue = String(pLEDStatus->getValue().c_str());
-    String ledBrightnessValue = String(pLEDBrightness->getValue().c_str());
-    String ledColorValue = String(pLEDColor->getValue().c_str());
-    String wifiStatusValue = String(pWiFiStatus->getValue().c_str());
-    String childLockValue = String(pChildLock->getValue().c_str());
+//     // Get current values from individual characteristics
+//     String doorStatusValue = String(pDoorStatus->getValue().c_str());
+//     String doorPositionValue = String(pDoorPosition->getValue().c_str());
+//     String ledStatusValue = String(pLEDStatus->getValue().c_str());
+//     String ledBrightnessValue = String(pLEDBrightness->getValue().c_str());
+//     String ledColorValue = String(pLEDColor->getValue().c_str());
+//     String wifiStatusValue = String(pWiFiStatus->getValue().c_str());
+//     String childLockValue = String(pChildLock->getValue().c_str());
     
-    // Populate JSON document
-    jsonDoc["door_status"] = doorStatusValue.toInt();
-    jsonDoc["door_position"] = doorPositionValue.toInt();
-    jsonDoc["led_status"] = ledStatusValue.toInt();
-    jsonDoc["led_brightness"] = ledBrightnessValue.toInt();
-    jsonDoc["led_color"] = ledColorValue;
-    jsonDoc["wifi_status"] = wifiStatusValue;
-    jsonDoc["child_lock"] = childLockValue.toInt();
-    jsonDoc["timestamp"] = millis();  // Add timestamp for freshness
+//     // Populate JSON document
+//     jsonDoc["door_status"] = doorStatusValue.toInt();
+//     jsonDoc["door_position"] = doorPositionValue.toInt();
+//     jsonDoc["led_status"] = ledStatusValue.toInt();
+//     jsonDoc["led_brightness"] = ledBrightnessValue.toInt();
+//     jsonDoc["led_color"] = ledColorValue;
+//     jsonDoc["wifi_status"] = wifiStatusValue;
+//     jsonDoc["child_lock"] = childLockValue.toInt();
+//     jsonDoc["timestamp"] = millis();  // Add timestamp for freshness
     
-    // Serialize JSON to string
-    char jsonBuffer[512];
-    size_t jsonLength = serializeJson(jsonDoc, jsonBuffer);
+//     // Serialize JSON to string
+//     char jsonBuffer[512];
+//     size_t jsonLength = serializeJson(jsonDoc, jsonBuffer);
     
-    // Update the characteristic
-    pJSONStatus->setValue(jsonBuffer);
+//     // Update the characteristic
+//     pJSONStatus->setValue(jsonBuffer);
     
-    // Notify connected clients if any
-    if (isClientConnected) {
-        pJSONStatus->notify();
-    }
+//     // Notify connected clients if any
+//     if (isClientConnected) {
+//         pJSONStatus->notify();
+//     }
     
-    Serial.print("JSON Status updated: ");
-    Serial.println(jsonBuffer);
-}
+//     Serial.print("JSON Status updated: ");
+//     Serial.println(jsonBuffer);
+// }
 
-void BLEControl::checkJSONUpdate() {
-    unsigned long currentTime = millis();
+// void BLEControl::checkJSONUpdate() {
+//     unsigned long currentTime = millis();
     
-    // Update JSON status at regular intervals
-    if (currentTime - lastJSONUpdate >= JSON_UPDATE_INTERVAL) {
-        updateJSONStatus();
-        lastJSONUpdate = currentTime;
-    }
-}
+//     // Update JSON status at regular intervals
+//     if (currentTime - lastJSONUpdate >= JSON_UPDATE_INTERVAL) {
+//         updateJSONStatus();
+//         lastJSONUpdate = currentTime;
+//     }
+// }
 
 void BLEControl::startAdvertising() {
     if (pAdvertising) {
@@ -292,24 +293,24 @@ void BLEControl::handleClientConnect(uint16_t clientId) {
     Serial.printf("BLE Client connected (ID: %d)\n", clientId);
     
     // Send initial JSON status to new client
-    updateJSONStatus();
+    //updateJSONStatus();
     
     // Optional: Stop advertising to save resources (since we only want one connection)
     // Uncomment the next line if you want to stop advertising when connected
-    // stopAdvertising();
+    //stopAdvertising();////////////////////////////////////////////////////////////   // stopAdvertising();
 }
 
-void BLEControl::handleClientDisconnect() {
-    Serial.printf("BLE Client disconnected (ID: %d)\n", connectedClientId);
+// void BLEControl::handleClientDisconnect() {
+//     Serial.printf("BLE Client disconnected (ID: %d)\n", connectedClientId);
     
-    // Reset connection state
-    isClientConnected = false;
-    connectedClientId = 0;
+//     // Reset connection state
+//     isClientConnected = false;
+//     connectedClientId = 0;
     
-    // Restart advertising to allow new connections
-    Serial.println("Restarting BLE advertising...");
-    startAdvertising();
-}
+//     // Restart advertising to allow new connections
+//     Serial.println("Restarting BLE advertising...");
+//     startAdvertising();
+// }
 
 // All the existing characteristic handler methods remain the same
 void BLEControl::handleDoorStatusWrite(BLECharacteristic* characteristic) {
@@ -473,6 +474,7 @@ void BLEControl::finalizeNetwork() {
         
         String status;
         if (connected) {
+            wifiControlRef->saveCredentialsToNVS();
             status = "CONNECTED:" + networkBuffer + ":" + wifiControlRef->getLocalIP().toString();
             Serial.println("WiFi connection successful!");
         } else {
