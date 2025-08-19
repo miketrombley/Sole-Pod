@@ -65,7 +65,7 @@ bool hasProvisionedCerts() {
     return (!deviceCert.isEmpty() && !deviceKey.isEmpty() && !thingName.isEmpty());
 }
 
-void AWSconnection(){
+bool AWSconnection() {
     thingName = readStringFromNVS(NVS_NAMESPACE, "thingName");
     deviceCert = readStringFromNVS(NVS_NAMESPACE, "deviceCert");
     deviceKey = readStringFromNVS(NVS_NAMESPACE, "deviceKey");
@@ -73,7 +73,7 @@ void AWSconnection(){
 
     if (deviceCert.length() == 0 || deviceKey.length() == 0 || root_ca.length() == 0) {
         Serial.println("\n Missing cert, key or root CA");
-        return;
+        return false;
     }
 
     Serial.println("\n Thing Name:");
@@ -96,8 +96,9 @@ void AWSconnection(){
     if (!client.connect(thingName.c_str())) {
         Serial.println("\n Failed to connect MQTT.");
         Serial.println(client.state());
-        return;
+        return false;
     }
+
     Serial.println("\n Connected MQTT with new cert.");
     client.subscribe("testat/topic");
     const char* jsonPayload = "{\"message\":\"Hello from device\"}";
@@ -112,13 +113,17 @@ void AWSconnection(){
     } else {
         Serial.println("\n Failed to publish JSON message");
     }
+
     if (!systemInitialized) {
         setupSystem();
         systemInitialized = true;
     }
+
     publishReportedState("sneaker_pot_12345678", led_state, led_brightness, led_color, podOpenFlag, childLockOn);
 
+    return true;
 }
+
 
 void ResetChildLock() {
     if (WiFi.status() != WL_CONNECTED && fleetProvisioningDone) {
@@ -180,7 +185,12 @@ void loop() {
     if (wifiControl.getWiFiStatus() == WL_CONNECTED && !fleetProvisioningDone) {
         if (hasProvisionedCerts()) {
             Serial.println("\n Certificate is already in NVS. Connecting to AWS...");
-            AWSconnection();
+            if (AWSconnection()) {
+                Serial.println("\n Connected to AWS successfully!");
+                fleetProvisioningDone = true;
+            } else {
+                Serial.println("\n Failed to connect to AWS. Will retry later.");
+            }        
         } else {
             Serial.println("\n No certificate found. Performing Fleet Provisioning...");
             if (runFleetProvisioning()) {
@@ -191,7 +201,7 @@ void loop() {
                 Serial.println("\n Fleet provisioning failed!");
             }
         }
-        fleetProvisioningDone = true;
+        //fleetProvisioningDone = true;
     }
     
     ResetChildLock();
