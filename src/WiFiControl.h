@@ -2,18 +2,55 @@
 #define WIFI_CONTROL_H
 
 #include <WiFi.h>
+#include <Preferences.h>
 
 class WiFiControl {
 private:
     String ssid;
     String password;
+    Preferences prefs;
     String previousSSID;
     String previousPassword;
-    const unsigned long connectionTimeout = 30000; // Timeout in milliseconds (30 seconds)
+    const unsigned long connectionTimeout = 15000; // Timeout in milliseconds (30 seconds)
+    const char* NVS_NAMESPACE = "Wifi";
 
 public:
     WiFiControl() : ssid(""), password(""), previousSSID(""), previousPassword("") {}
     
+    void saveCredentialsToNVS() {
+        prefs.begin(NVS_NAMESPACE, false);
+        prefs.putString("ssid", ssid);
+        prefs.putString("password", password);
+        prefs.end();
+        Serial.println("WiFi credentials saved to NVS");
+    }
+
+    // Đọc SSID và Password từ NVS
+    bool loadCredentialsFromNVS() {
+        prefs.begin(NVS_NAMESPACE, true); // read-only
+        String storedSSID = prefs.getString("ssid", "");
+        String storedPassword = prefs.getString("password", "");
+        prefs.end();
+
+        if (storedSSID.length() > 0) {
+            ssid = storedSSID;
+            password = storedPassword;
+            Serial.printf("Loaded WiFi credentials from NVS: %s\n", ssid.c_str());
+            return true;
+        }
+        return false;
+    }
+
+    void clearCredentialsFromNVS() {
+        prefs.begin(NVS_NAMESPACE, false);
+        prefs.remove("ssid");
+        prefs.remove("password");
+        prefs.end();
+        ssid = "";
+        password = "";
+        Serial.println("WiFi credentials removed from NVS");
+    }
+
     // Returns the current WiFi status as defined by the WiFi.h library
     int getWiFiStatus() {
         return WiFi.status();

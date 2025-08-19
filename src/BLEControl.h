@@ -41,7 +41,7 @@ public:
     BLEServerCallback(BLEControl* control) : bleControl(control) {}
     
     void onConnect(BLEServer* pServer) override;
-    void onDisconnect(BLEServer* pServer) override;
+    //void onDisconnect(BLEServer* pServer) override;
 };
 
 // Generic callback class for BLE characteristics
@@ -100,8 +100,8 @@ public:
     void begin();
     
     // JSON status management
-    void updateJSONStatus();
-    void checkJSONUpdate();  // Call this from main loop
+    //void updateJSONStatus();
+    //void checkJSONUpdate();  // Call this from main loop
     
     // Connection management
     void startAdvertising();
